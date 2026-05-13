@@ -1,0 +1,121 @@
+\BLOCK{extends "ecss_base.tex"}
+\BLOCK{block body}
+
+\section{Scope}
+This Design Definition File (DDF) describes the system design for \VAR{mission_name} at Phase \VAR{phase}, in accordance with ECSS-E-ST-10C.
+
+\subsection{Applicable Documents}
+\begin{itemize}
+\item ECSS-E-ST-10C — System engineering general requirements
+\item ECSS-E-HB-10-02A — Verification guidelines
+\item \VAR{mission_name} System Requirements Document
+\end{itemize}
+
+\section{Mission Overview}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Mission & \VAR{mission_name} \\
+Orbit & \VAR{orbit} \\
+Phase & \VAR{phase} — \VAR{phase_name} \\
+Target Launch & \VAR{launch_date} \\
+Lifetime & \VAR{lifetime} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Product Tree}
+
+\subsection{System Architecture}
+\begin{longtable}{lllll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Code} & \textbf{Name} & \textbf{Level} & \textbf{Parent} & \textbf{Subsystem} \\
+\midrule
+\endhead
+\BLOCK{for n in product_tree}
+\VAR{n.code} & \VAR{n.name} & \VAR{n.level} & \VAR{n.parent or "---"} & \VAR{n.subsystem or ""} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Subsystem Descriptions}
+\BLOCK{for sub in subsystems}
+\subsection{\VAR{sub.name} (\VAR{sub.code})}
+\begin{tabular}{p{4cm}p{9cm}}
+\textbf{Components:} & \VAR{sub.components} \\
+\textbf{Mass (w/ margin):} & \VAR{"%.1f"|format(sub.mass)} kg \\
+\textbf{Power (w/ margin):} & \VAR{"%.1f"|format(sub.power)} W \\
+\textbf{ECSS Standard:} & \VAR{sub.ecss_standard} \\
+\textbf{Lead:} & \VAR{sub.lead} \\
+\end{tabular}
+\BLOCK{endfor}
+
+\section{Budget Summary}
+
+\subsection{Mass Budget}
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\rowcolor{ecsslight}
+& \textbf{Nominal [kg]} & \textbf{With Margin [kg]} \\
+\midrule
+Dry Mass & \VAR{"%.1f"|format(dry_nominal)} & \VAR{"%.1f"|format(dry_with_margin)} \\
+System Margin & & \VAR{"%.1f"|format(system_margin_kg)} \\
+\midrule
+Dry Mass Total & & \textbf{\VAR{"%.1f"|format(dry_with_system)}} \\
+Propellant & \VAR{"%.1f"|format(propellant_kg)} & \VAR{"%.1f"|format(propellant_kg)} \\
+\midrule
+\textbf{Wet Mass} & & \textbf{\VAR{"%.1f"|format(wet_mass)}} \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\small Limit: \VAR{"%.1f"|format(mass_limit)} kg \quad Status: \BLOCK{if mass_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif}
+\end{flushleft}
+\end{table}
+
+\subsection{Power Budget}
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\rowcolor{ecsslight}
+& \textbf{Nominal [W]} & \textbf{With Margin [W]} \\
+\midrule
+Equipment Total & \VAR{"%.1f"|format(power_nominal)} & \VAR{"%.1f"|format(power_with_margin)} \\
+System Margin & & \VAR{"%.1f"|format(power_system_margin_w)} \\
+\midrule
+\textbf{Total} & & \textbf{\VAR{"%.1f"|format(power_with_system)}} \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\small Limit: \VAR{"%.1f"|format(power_limit)} W \quad Status: \BLOCK{if power_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif}
+\end{flushleft}
+\end{table}
+
+\section{Key Design Drivers}
+\begin{itemize}
+\BLOCK{for d in design_drivers}
+\item \VAR{d}
+\BLOCK{endfor}
+\end{itemize}
+
+\section{Open Items \& TBDs}
+\begin{longtable}{clp{8cm}}
+\toprule
+\rowcolor{ecsslight}
+\textbf{\#} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+\BLOCK{for item in open_items}
+\VAR{loop.index} & \VAR{item.type} & \VAR{item.description} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\BLOCK{endblock}

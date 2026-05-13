@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment
+.env
+
+# Data
+data/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Alembic
+src/bepi/db/migrations/versions/*.py
+!src/bepi/db/migrations/versions/.gitkeep
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Node (Next.js frontend)
+node_modules/
+.next/
+out/
+
+# Claude
+.claude/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Generated
+*.mat
+*.log

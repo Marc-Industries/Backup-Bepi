@@ -1,0 +1,17 @@
+streamlit>=1.40.0
+supabase>=2.0.0
+httpx>=0.25.0
+plotly
+pandas
+numpy
+scipy
+openpyxl
+streamlit-option-menu
+streamlit-antd-components
+streamlit-extras
+streamlit-plotly-events
+jinja2
+postgrest>=0.14.0
+realtime>=0.27.0
+storage3>=0.11.0
+gotrue>=2.0.0

@@ -1,0 +1,99 @@
+\BLOCK{extends "ecss_base.tex"}
+\BLOCK{block body}
+
+\section{Scope}
+This document presents the risk assessment for \VAR{mission_name} at Phase \VAR{phase}, in accordance with ECSS-M-ST-80C.
+
+\subsection{Applicable Documents}
+\begin{itemize}
+\item ECSS-M-ST-80C — Risk Management
+\item ECSS-Q-ST-30C — Dependability
+\item ECSS-Q-ST-40C — Safety
+\end{itemize}
+
+\section{Risk Assessment Methodology}
+
+\subsection{Risk Matrix}
+Risks are assessed on a 5$\times$5 matrix (Likelihood $\times$ Consequence):
+
+\begin{table}[H]
+\centering
+\caption{Risk Scoring Criteria}
+\begin{tabular}{cl}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Score} & \textbf{Likelihood} \\
+\midrule
+1 & Rare — unlikely to occur \\
+2 & Unlikely — could occur but not expected \\
+3 & Possible — might occur \\
+4 & Likely — will probably occur \\
+5 & Almost certain — expected to occur \\
+\bottomrule
+\end{tabular}
+\quad
+\begin{tabular}{cl}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Score} & \textbf{Consequence} \\
+\midrule
+1 & Negligible \\
+2 & Minor \\
+3 & Moderate \\
+4 & Major \\
+5 & Catastrophic \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Risk Level: \textbf{Critical} ($\geq$15), \textbf{High} ($\geq$9), \textbf{Medium} ($\geq$4), \textbf{Low} ($<$4).
+
+\subsection{Risk Summary}
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Level} & \textbf{Count} & \textbf{Open} & \textbf{Mitigating} \\
+\midrule
+\BLOCK{for lvl in risk_summary}
+\VAR{lvl.level|capitalize} & \VAR{lvl.count} & \VAR{lvl.open} & \VAR{lvl.mitigating} \\
+\BLOCK{endfor}
+\midrule
+\textbf{Total} & \textbf{\VAR{total_risks}} & \textbf{\VAR{total_open}} & \textbf{\VAR{total_mitigating}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Risk Register}
+\BLOCK{for r in risks}
+\subsection{\VAR{r.risk_id} — \VAR{r.title}}
+\begin{tabular}{p{4cm}p{9cm}}
+\textbf{Description:} & \VAR{r.description} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Likelihood:} & \VAR{r.likelihood} \\
+\textbf{Consequence:} & \VAR{r.consequence} \\
+\textbf{Risk Score:} & \VAR{r.score} (\VAR{r.level|upper}) \\
+\textbf{Status:} & \VAR{r.status|upper} \\
+\textbf{Owner:} & \VAR{r.owner} \\
+\textbf{Mitigation:} & \VAR{r.mitigation} \\
+\BLOCK{if r.residual_l}
+\textbf{Residual L/C:} & \VAR{r.residual_l}/\VAR{r.residual_c} (Score: \VAR{r.residual_l * r.residual_c}) \\
+\BLOCK{endif}
+\end{tabular}
+\BLOCK{endfor}
+
+\section{FMECA Summary}
+\begin{longtable}{lp{3cm}ccccp{3cm}}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Node} & \textbf{Failure Mode} & \textbf{S} & \textbf{O} & \textbf{D} & \textbf{RPN} & \textbf{Mitigation} \\
+\midrule
+\endhead
+\BLOCK{for f in fmeca}
+\VAR{f.node} & \VAR{f.mode} & \VAR{f.severity} & \VAR{f.occurrence} & \VAR{f.detection} & \textbf{\VAR{f.rpn}} & \VAR{f.mitigation} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\BLOCK{endblock}

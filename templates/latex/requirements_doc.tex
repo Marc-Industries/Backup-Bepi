@@ -1,0 +1,127 @@
+\BLOCK{extends "ecss_base.tex"}
+\BLOCK{block body}
+
+\section{Scope}
+This document defines the requirements for the \VAR{mission_name} mission at Phase \VAR{phase}, in accordance with ECSS-E-ST-10C.
+
+\subsection{Applicable Documents}
+\begin{itemize}
+\item ECSS-E-ST-10C — System engineering general requirements
+\item ECSS-E-ST-10-06C — Technical requirements specification
+\item \VAR{mission_name} Mission Definition Document
+\end{itemize}
+
+\section{Requirements Overview}
+
+\begin{table}[H]
+\centering
+\caption{Requirements Summary}
+\begin{tabular}{lcccc}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Level} & \textbf{Total} & \textbf{Verified} & \textbf{In Progress} & \textbf{Coverage} \\
+\midrule
+\BLOCK{for lvl in coverage_by_level}
+\VAR{lvl.level|capitalize} & \VAR{lvl.total} & \VAR{lvl.verified} & \VAR{lvl.in_progress} & \VAR{"%.0f"|format(lvl.pct)}\% \\
+\BLOCK{endfor}
+\midrule
+\textbf{Total} & \textbf{\VAR{total_reqs}} & \textbf{\VAR{total_verified}} & \textbf{\VAR{total_in_progress}} & \textbf{\VAR{"%.0f"|format(overall_pct)}\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Stakeholder Requirements}
+\BLOCK{for r in reqs_stakeholder}
+\subsection{\VAR{r.req_id} — \VAR{r.title}}
+\begin{tabular}{p{3cm}p{10cm}}
+\textbf{Text:} & \VAR{r.text} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Priority:} & Mandatory \\
+\textbf{V\&V Method:} & \VAR{r.method|upper} \\
+\textbf{Status:} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} \\
+\textbf{Allocated to:} & \VAR{r.allocated_to or "\\na"} \\
+\textbf{Owner:} & \VAR{r.owner or "\\tbd"} \\
+\end{tabular}
+\BLOCK{endfor}
+
+\section{Mission Requirements}
+\BLOCK{for r in reqs_mission}
+\subsection{\VAR{r.req_id} — \VAR{r.title}}
+\begin{tabular}{p{3cm}p{10cm}}
+\textbf{Text:} & \VAR{r.text} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Parent:} & \VAR{r.parent_id or "\\na"} \\
+\textbf{V\&V Method:} & \VAR{r.method|upper} \\
+\textbf{Status:} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} \\
+\textbf{Allocated to:} & \VAR{r.allocated_to or "\\na"} \\
+\end{tabular}
+\BLOCK{endfor}
+
+\section{System Requirements}
+\BLOCK{for r in reqs_system}
+\subsection{\VAR{r.req_id} — \VAR{r.title}}
+\begin{tabular}{p{3cm}p{10cm}}
+\textbf{Text:} & \VAR{r.text} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Parent:} & \VAR{r.parent_id or "\\na"} \\
+\textbf{V\&V Method:} & \VAR{r.method|upper} \\
+\textbf{Status:} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} \\
+\textbf{Allocated to:} & \VAR{r.allocated_to or "\\na"} \\
+\end{tabular}
+\BLOCK{endfor}
+
+\section{Subsystem Requirements}
+\BLOCK{for r in reqs_subsystem}
+\subsection{\VAR{r.req_id} — \VAR{r.title}}
+\begin{tabular}{p{3cm}p{10cm}}
+\textbf{Text:} & \VAR{r.text} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Parent:} & \VAR{r.parent_id or "\\na"} \\
+\textbf{V\&V Method:} & \VAR{r.method|upper} \\
+\textbf{Status:} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} \\
+\textbf{Allocated to:} & \VAR{r.allocated_to or "\\na"} \\
+\end{tabular}
+\BLOCK{endfor}
+
+\BLOCK{if reqs_equipment}
+\section{Equipment Requirements}
+\BLOCK{for r in reqs_equipment}
+\subsection{\VAR{r.req_id} — \VAR{r.title}}
+\begin{tabular}{p{3cm}p{10cm}}
+\textbf{Text:} & \VAR{r.text} \\
+\textbf{Category:} & \VAR{r.category|capitalize} \\
+\textbf{Parent:} & \VAR{r.parent_id or "\\na"} \\
+\textbf{V\&V Method:} & \VAR{r.method|upper} \\
+\textbf{Status:} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} \\
+\textbf{Allocated to:} & \VAR{r.allocated_to or "\\na"} \\
+\end{tabular}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\section{Verification Matrix}
+\begin{longtable}{lp{4cm}llll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{ID} & \textbf{Title} & \textbf{Level} & \textbf{Method} & \textbf{Status} & \textbf{Owner} \\
+\midrule
+\endhead
+\BLOCK{for r in all_reqs}
+\VAR{r.req_id} & \VAR{r.title} & \VAR{r.level} & \VAR{r.method|upper} & \BLOCK{if r.status == "passed"}\statuspass\BLOCK{elif r.status == "in_progress"}\statuswip\BLOCK{else}\VAR{r.status}\BLOCK{endif} & \VAR{r.owner or ""} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Traceability Matrix}
+\begin{longtable}{llp{6cm}}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Requirement} & \textbf{Parent} & \textbf{Allocated To} \\
+\midrule
+\endhead
+\BLOCK{for r in all_reqs}
+\VAR{r.req_id} & \VAR{r.parent_id or "---"} & \VAR{r.allocated_to or "---"} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\BLOCK{endblock}

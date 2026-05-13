@@ -1,0 +1,132 @@
+\BLOCK{extends "ecss_base.tex"}
+\BLOCK{block body}
+
+\section{Scope}
+This Review Data Package supports the \VAR{review_name} for \VAR{mission_name}, Phase \VAR{phase}.
+
+\subsection{Review Information}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Item} & \textbf{Value} \\
+\midrule
+Review & \VAR{review_name} \\
+Phase Transition & \VAR{phase_before} $\rightarrow$ \VAR{phase_after} \\
+Planned Date & \VAR{review_date} \\
+Status & \VAR{review_status} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Entry Criteria Assessment}
+\begin{longtable}{cp{10cm}c}
+\toprule
+\rowcolor{ecsslight}
+\textbf{\#} & \textbf{Criterion} & \textbf{Status} \\
+\midrule
+\endhead
+\BLOCK{for c in entry_criteria}
+\VAR{loop.index} & \VAR{c.text} & \BLOCK{if c.met}\statuspass\BLOCK{else}\statusfail\BLOCK{endif} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Deliverables Status}
+\begin{longtable}{lp{5cm}lll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{DRD Code} & \textbf{Title} & \textbf{Status} & \textbf{Owner} & \textbf{Due} \\
+\midrule
+\endhead
+\BLOCK{for d in deliverables}
+\VAR{d.drd_code} & \VAR{d.title} & \VAR{d.status|upper} & \VAR{d.owner} & \VAR{d.due_date} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Technical Status Summary}
+
+\subsection{Requirements Coverage}
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Level} & \textbf{Total} & \textbf{Verified} & \textbf{Coverage} \\
+\midrule
+\BLOCK{for lvl in req_coverage}
+\VAR{lvl.level|capitalize} & \VAR{lvl.total} & \VAR{lvl.verified} & \VAR{"%.0f"|format(lvl.pct)}\% \\
+\BLOCK{endfor}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Budget Status}
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrrl}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Budget} & \textbf{Allocated} & \textbf{Limit} & \textbf{Margin} & \textbf{Status} \\
+\midrule
+Mass (wet) & \VAR{"%.1f"|format(wet_mass)} kg & \VAR{"%.1f"|format(mass_limit)} kg & \VAR{"%.1f"|format(mass_remaining)} kg & \BLOCK{if mass_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif} \\
+Power & \VAR{"%.1f"|format(power_with_system)} W & \VAR{"%.1f"|format(power_limit)} W & \VAR{"%.1f"|format(power_remaining)} W & \BLOCK{if power_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Risk Status}
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\rowcolor{ecsslight}
+& \textbf{Critical} & \textbf{High} & \textbf{Medium} & \textbf{Low} \\
+\midrule
+Count & \VAR{risk_critical} & \VAR{risk_high} & \VAR{risk_medium} & \VAR{risk_low} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Schedule Status}
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Project Duration & \VAR{schedule_duration} days \\
+End Date & \VAR{schedule_end} \\
+Critical Tasks & \VAR{critical_tasks} \\
+Overall Progress & \VAR{"%.0f"|format(overall_progress)}\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Top Risks}
+\BLOCK{for r in top_risks}
+\begin{itemize}
+\item \textbf{\VAR{r.risk_id}}: \VAR{r.title} (L=\VAR{r.likelihood}, C=\VAR{r.consequence}, Score=\VAR{r.score}) — \VAR{r.status|upper}
+\end{itemize}
+\BLOCK{endfor}
+
+\section{Action Items}
+\begin{longtable}{clp{5cm}lll}
+\toprule
+\rowcolor{ecsslight}
+\textbf{\#} & \textbf{Type} & \textbf{Action} & \textbf{Owner} & \textbf{Due} & \textbf{Status} \\
+\midrule
+\endhead
+\BLOCK{for a in action_items}
+\VAR{loop.index} & \VAR{a.type} & \VAR{a.action} & \VAR{a.owner} & \VAR{a.due} & \VAR{a.status} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Recommendation}
+\VAR{recommendation}
+
+\BLOCK{endblock}

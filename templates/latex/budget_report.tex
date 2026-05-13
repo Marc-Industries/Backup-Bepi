@@ -1,0 +1,119 @@
+\BLOCK{extends "ecss_base.tex"}
+\BLOCK{block body}
+
+\section{Scope}
+This document presents the mass and power budget for the \VAR{mission_name} mission at Phase \VAR{phase}. Budget allocations are computed in accordance with ECSS-E-HB-10-02A margin philosophy.
+
+\subsection{Applicable Documents}
+\begin{itemize}
+\item ECSS-E-HB-10-02A — Verification guidelines
+\item ECSS-M-ST-10C — Project planning and implementation
+\item \VAR{mission_name} System Requirements Document (\VAR{doc_number|replace("BUD","SRD")})
+\end{itemize}
+
+\section{Margin Philosophy}
+Margins are applied according to ECSS-E-HB-10-02A, Table 1, as a function of mission phase and equipment maturity.
+
+\begin{table}[H]
+\centering
+\caption{Component Margin Policy — Phase \VAR{phase}}
+\begin{tabular}{lccc}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Maturity} & \textbf{Estimate} & \textbf{Measured} & \textbf{Qualified} \\
+\midrule
+\BLOCK{for row in margin_table}
+\VAR{row.phase} & \VAR{row.estimate}\% & \VAR{row.measured}\% & \VAR{row.qualified}\% \\
+\BLOCK{endfor}
+\bottomrule
+\end{tabular}
+\end{table}
+
+System-level margin for Phase \VAR{phase}: \textbf{\VAR{system_margin}\%}.
+
+\section{Mass Budget}
+
+\subsection{Summary}
+\begin{table}[H]
+\centering
+\caption{Mass Budget Summary}
+\begin{tabularx}{\textwidth}{Xlrrrrr}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Subsystem} & \textbf{Code} & \textbf{Nominal [kg]} & \textbf{w/ Margin [kg]} & \textbf{Margin [\%]} & \textbf{Items} \\
+\midrule
+\BLOCK{for s in mass_by_subsystem}
+\VAR{s.name} & \VAR{s.code} & \VAR{"%.1f"|format(s.nominal)} & \VAR{"%.1f"|format(s.with_margin)} & \VAR{"%.1f"|format(s.margin_pct)} & \VAR{s.count} \\
+\BLOCK{endfor}
+\midrule
+\textbf{Dry Mass Subtotal} & & \textbf{\VAR{"%.1f"|format(dry_nominal)}} & \textbf{\VAR{"%.1f"|format(dry_with_margin)}} & & \\
+System Margin (\VAR{system_margin}\%) & & & \VAR{"%.1f"|format(system_margin_kg)} & & \\
+\midrule
+\textbf{Dry Mass with System Margin} & & & \textbf{\VAR{"%.1f"|format(dry_with_system)}} & & \\
+Propellant & & \VAR{"%.1f"|format(propellant_kg)} & \VAR{"%.1f"|format(propellant_kg)} & & \\
+\midrule
+\textbf{Wet Mass} & & & \textbf{\VAR{"%.1f"|format(wet_mass)}} & & \\
+\bottomrule
+\end{tabularx}
+\begin{flushleft}
+\small Budget Limit: \VAR{"%.1f"|format(mass_limit)} kg \quad
+Remaining: \VAR{"%.1f"|format(mass_remaining)} kg \quad
+Status: \BLOCK{if mass_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif}
+\end{flushleft}
+\end{table}
+
+\subsection{Mass Breakdown — Equipment Level}
+\begin{longtable}{llrrrrl}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Code} & \textbf{Name} & \textbf{Nom. [kg]} & \textbf{Qty} & \textbf{Margin [\%]} & \textbf{Total [kg]} & \textbf{Mat.} \\
+\midrule
+\endhead
+\BLOCK{for e in mass_equipment}
+\VAR{e.code} & \VAR{e.name} & \VAR{"%.2f"|format(e.nominal)} & \VAR{e.qty} & \VAR{"%.0f"|format(e.margin_pct)} & \VAR{"%.2f"|format(e.total)} & \VAR{e.maturity} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\section{Power Budget}
+
+\subsection{Summary — Nominal Mode}
+\begin{table}[H]
+\centering
+\caption{Power Budget Summary — Nominal Mode}
+\begin{tabularx}{\textwidth}{Xlrrr}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Subsystem} & \textbf{Code} & \textbf{Nominal [W]} & \textbf{w/ Margin [W]} & \textbf{Margin [\%]} \\
+\midrule
+\BLOCK{for s in power_by_subsystem}
+\VAR{s.name} & \VAR{s.code} & \VAR{"%.1f"|format(s.nominal)} & \VAR{"%.1f"|format(s.with_margin)} & \VAR{"%.1f"|format(s.margin_pct)} \\
+\BLOCK{endfor}
+\midrule
+\textbf{Total} & & \textbf{\VAR{"%.1f"|format(power_nominal)}} & \textbf{\VAR{"%.1f"|format(power_with_margin)}} & \\
+System Margin (\VAR{system_margin}\%) & & & \VAR{"%.1f"|format(power_system_margin_w)} & \\
+\midrule
+\textbf{Total with System Margin} & & & \textbf{\VAR{"%.1f"|format(power_with_system)}} & \\
+\bottomrule
+\end{tabularx}
+\begin{flushleft}
+\small Budget Limit: \VAR{"%.1f"|format(power_limit)} W \quad
+Remaining: \VAR{"%.1f"|format(power_remaining)} W \quad
+Status: \BLOCK{if power_remaining > 0}\statuspass\BLOCK{else}\statusfail\BLOCK{endif}
+\end{flushleft}
+\end{table}
+
+\subsection{Power Breakdown — Equipment Level}
+\begin{longtable}{llrrrrl}
+\toprule
+\rowcolor{ecsslight}
+\textbf{Code} & \textbf{Name} & \textbf{Nom. [W]} & \textbf{Qty} & \textbf{Margin [\%]} & \textbf{Total [W]} & \textbf{Mat.} \\
+\midrule
+\endhead
+\BLOCK{for e in power_equipment}
+\VAR{e.code} & \VAR{e.name} & \VAR{"%.1f"|format(e.nominal)} & \VAR{e.qty} & \VAR{"%.0f"|format(e.margin_pct)} & \VAR{"%.1f"|format(e.total)} & \VAR{e.maturity} \\
+\BLOCK{endfor}
+\bottomrule
+\end{longtable}
+
+\BLOCK{endblock}
