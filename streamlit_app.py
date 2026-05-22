@@ -121,36 +121,19 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                             if n.get("code") == code:
                                 node_uuid = n.get("uuid") or n.get("id")
                                 if node_uuid:
-                                    # Use upsert - update if exists, insert if not
-                                    # First try update
-                                    try:
-                                        client.table("budgets").update({
-                                            "nominal_value": eb[code]["mass"],
-                                            "updated_at": "now()"
-                                        }).eq("node_id", node_uuid).eq("budget_type", "mass_kg").execute()
-                                    except:
-                                        # If update fails (no row), insert
-                                        client.table("budgets").insert({
-                                            "node_id": node_uuid,
-                                            "budget_type": "mass_kg",
-                                            "nominal_value": eb[code]["mass"],
-                                            "unit": "kg",
-                                            "maturity": "estimate"
-                                        }).execute()
-                                    
-                                    try:
-                                        client.table("budgets").update({
-                                            "nominal_value": eb[code]["power"],
-                                            "updated_at": "now()"
-                                        }).eq("node_id", node_uuid).eq("budget_type", "power_w").execute()
-                                    except:
-                                        client.table("budgets").insert({
-                                            "node_id": node_uuid,
-                                            "budget_type": "power_w",
-                                            "nominal_value": eb[code]["power"],
-                                            "unit": "W",
-                                            "maturity": "estimate"
-                                        }).execute()
+                                    for btype, field, unit in [("mass_kg", "mass", "kg"), ("power_w", "power", "W")]:
+                                        res = client.table("budgets").update({
+                                            "nominal_value": eb[code][field],
+                                            "maturity": eb[code]["mat"],
+                                        }).eq("node_id", node_uuid).eq("budget_type", btype).execute()
+                                        if not res.data:
+                                            client.table("budgets").insert({
+                                                "node_id": node_uuid,
+                                                "budget_type": btype,
+                                                "nominal_value": eb[code][field],
+                                                "unit": unit,
+                                                "maturity": eb[code]["mat"],
+                                            }).execute()
                                 break
                     except Exception as e:
                         st.error(f"Update Error: {e}")
@@ -1054,12 +1037,10 @@ if "pt_action" in st.query_params:
     except:
         data = {}
     
-    st.write("DEBUG: Received action:", action, "data:", data.get("code", ""))
-    
-    # Process the action
     flat = _get_product_tree()
     eb = _get_equip_budgets()
     _process_product_tree_action(action, data, flat, eb)
+    st.rerun()
 
 
 def _build_budget_tree():
@@ -1804,33 +1785,23 @@ def page_product_tree():
     flat = _get_product_tree()
     eb = _get_equip_budgets()
     
-    # Debug: show current state
-    _role = st.session_state.get("user", {}).get("role", "UNKNOWN")
-    st.write(f"DEBUG: User role = {_role}")
-
     # --- Query Params Bridge (JS -> Python) ---
     action = None
     data = None
-    
+
     if "pt_action" in st.query_params:
         action_val = st.query_params.get("pt_action")
         action = action_val[0] if isinstance(action_val, (list, tuple)) else action_val
         data_val = st.query_params.get("pt_data", "{}")
         data_str = data_val[0] if isinstance(data_val, (list, tuple)) else data_val
-        st.write(f"DEBUG: pt_action = {action}, pt_data = {str(data_str)[:100]}")
         try:
             data = json.loads(urllib.parse.unquote(data_str))
-        except Exception as e:
-            st.write(f"DEBUG: JSON parse error: {e}")
+        except Exception:
             data = {}
-        
-        st.write(f"DEBUG: parsed data = {data}")
-        
-        # ADMIN can do everything - no permission checks
+
         _role = st.session_state.get("user", {}).get("role", "USER")
         client = get_service_client() or get_supabase()
         mission_id = st.session_state.get("active_mission_id")
-        st.write(f"DEBUG: client={client is not None}, mission_id={mission_id}")
 
         def _parent_uuid(parent_id: str | None) -> str | None:
             if not parent_id:
@@ -1892,10 +1863,10 @@ def page_product_tree():
                                     client.table("budgets").delete().eq("node_id", uuid_val).execute()
                                     client.table("product_tree_nodes").delete().eq("id", uuid_val).execute()
                                 break
-                except:
-                    pass
+                except Exception as e:
+                    st.error(f"Eliminazione fallita: {e}")
             st.session_state["product_tree"] = [n for n in st.session_state["product_tree"] if str(n["id"]) not in to_delete]
-        
+
         elif action == "edit_node":
             node_id = data.get("id")
             client = get_supabase()
@@ -1918,10 +1889,10 @@ def page_product_tree():
                                     "trl": n.get("trl", 1),
                                     "status": n.get("status", "proposed"),
                                 }).eq("id", uuid_val).execute()
-                        except:
-                            pass
+                        except Exception as e:
+                            st.error(f"Salvataggio nodo fallito: {e}")
                     break
-        
+
         elif action == "update_item":
             code = data.get("code")
             if code in eb:
@@ -1945,9 +1916,9 @@ def page_product_tree():
                                         "maturity": eb[code]["mat"],
                                     }).eq("node_id", node_uuid).eq("budget_type", "power_w").execute()
                                 break
-                    except:
-                        pass
-        
+                    except Exception as e:
+                        st.error(f"Aggiornamento budget fallito: {e}")
+
         elif action == "nav_page":
             st.session_state.current_page = data.get("page")
         
@@ -5218,6 +5189,8 @@ def page_team():
                 },
             )
             if not edited_team.equals(df_team):
+                from bepi.db_writer import update_mission_member
+                _mid = st.session_state.get("active_mission_id")
                 for i, row in edited_team.iterrows():
                     m = get_team()[i]
                     m["name"] = row["Name"]
@@ -5229,6 +5202,11 @@ def page_team():
                         m["subsystem"] = sub
                     elif "subsystem" in m:
                         del m["subsystem"]
+                    if _mid and HAS_SUPABASE:
+                        update_mission_member(_mid, m["id"], {
+                            "role": m["role"],
+                            "subsystem": m.get("subsystem"),
+                        })
                 st.rerun()
         else:
             st.dataframe(df_team, width="stretch", hide_index=True, height=min(len(roster_rows) * 38 + 40, 400))

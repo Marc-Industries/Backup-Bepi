@@ -1,6 +1,13 @@
 from bepi.supabase_client import get_supabase, get_service_client
 
 
+def update_mission_member(mission_id: str, user_id: str, updates: dict) -> None:
+    client = get_service_client() or get_supabase()
+    if not client or not mission_id or not user_id:
+        return
+    client.table("mission_members").update(updates).eq("mission_id", mission_id).eq("user_id", user_id).execute()
+
+
 def add_mission_member(mission_id: str, user_id: str, role: str = "PM", subsystem: str | None = None) -> dict | None:
     client = get_service_client() or get_supabase()
     if not client or not mission_id or not user_id:
