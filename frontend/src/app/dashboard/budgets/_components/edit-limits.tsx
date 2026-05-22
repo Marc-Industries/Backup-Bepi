@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
+import { resolveActiveMissionId } from "@/lib/active-mission";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 
 interface Props {
   massLimit: number;
@@ -27,11 +26,13 @@ export function EditLimits({ massLimit, powerLimit, propellant }: Props) {
 
   async function handleSave() {
     if (!supabase) return;
+    const missionId = await resolveActiveMissionId();
+    if (!missionId) { alert("No mission found in Supabase"); return; }
     setSaving(true);
     await supabase
       .from("missions")
       .update({ mass_limit_kg: mass, power_limit_w: power, propellant_mass_kg: prop })
-      .eq("id", MISSION_ID);
+      .eq("id", missionId);
     setSaving(false);
     setSaved(true);
   }

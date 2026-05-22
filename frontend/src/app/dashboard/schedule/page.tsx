@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,23 @@ import {
 } from "@/components/ui/dialog"
 import { supabase } from "@/lib/supabase"
 import { DEMO_TASKS } from "@/lib/mock-data"
+import { resolveActiveMissionId } from "@/lib/active-mission"
+import type { ScheduleTask } from "@/lib/types"
 
-const MISSION_ID = "00000000-0000-0000-0000-000000000001"
 const inputClass = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 const labelClass = "text-xs font-medium text-muted-foreground"
+
+type ScheduleTaskRow = {
+  id: string
+  mission_id: string
+  name: string
+  start_date: string
+  end_date: string
+  progress_pct: number | null
+  assigned_to: string | null
+  is_milestone: boolean | null
+  created_at: string | null
+}
 
 function parseDate(d: string) { return new Date(d + "T00:00:00") }
 function formatDate(d: string) {
@@ -32,14 +45,14 @@ function monthsBetween(start: Date, end: Date) {
   return months
 }
 
-function statusColor(task: (typeof DEMO_TASKS)[0]) {
+function statusColor(task: ScheduleTask) {
   if (task.milestone) return "bg-purple-500"
   if (task.progress === 100) return "bg-emerald-500"
   if (task.progress > 0) return "bg-blue-500"
   return "bg-zinc-600"
 }
 
-function statusLabel(task: (typeof DEMO_TASKS)[0]) {
+function statusLabel(task: ScheduleTask) {
   if (task.milestone && task.progress === 100) return "Completed"
   if (task.milestone) return "Milestone"
   if (task.progress === 100) return "Completed"
@@ -47,16 +60,56 @@ function statusLabel(task: (typeof DEMO_TASKS)[0]) {
   return "Not Started"
 }
 
-function statusBadgeVariant(task: (typeof DEMO_TASKS)[0]): "default" | "secondary" | "outline" | "destructive" {
+function statusBadgeVariant(task: ScheduleTask): "default" | "secondary" | "outline" | "destructive" {
   if (task.progress === 100) return "default"
   if (task.progress > 0) return "secondary"
   return "outline"
 }
 
 export default function SchedulePage() {
-  const tasks = DEMO_TASKS
+  const [missionId, setMissionId] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<ScheduleTask[]>(DEMO_TASKS)
 
-  const { timelineStart, timelineEnd, months, totalDays } = useMemo(() => {
+  useEffect(() => {
+    (async () => {
+      const activeId = await resolveActiveMissionId()
+      setMissionId(activeId)
+      if (!activeId) return
+
+      const { data, error } = await supabase
+        .from("schedule_tasks")
+        .select("*")
+        .eq("mission_id", activeId)
+        .order("start_date", { ascending: true })
+
+      if (error) return
+      if (!data) return
+
+      const mapped: ScheduleTask[] = (data as unknown as ScheduleTaskRow[]).map((r) => ({
+        id: r.id,
+        mission_id: r.mission_id,
+        name: r.name,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        progress: r.progress_pct ?? 0,
+        responsible: r.assigned_to ?? "",
+        predecessors: [],
+        milestone: r.is_milestone ?? false,
+        created_at: r.created_at ?? "",
+      }))
+
+      // If the DB is empty for this mission, show an empty schedule instead of demo tasks.
+      setTasks(mapped)
+    })()
+  }, [])
+
+  const { timelineStart, months, totalDays } = useMemo(() => {
+    if (tasks.length === 0) {
+      const now = new Date()
+      const s = new Date(now.getFullYear(), now.getMonth(), 1)
+      const e = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      return { timelineStart: s, months: monthsBetween(s, e), totalDays: 30 }
+    }
     const starts = tasks.map((t) => parseDate(t.start_date))
     const ends = tasks.map((t) => parseDate(t.end_date))
     const min = new Date(Math.min(...starts.map((d) => d.getTime())))
@@ -65,7 +118,7 @@ export default function SchedulePage() {
     const e = new Date(max.getFullYear(), max.getMonth() + 1, 0)
     const ms = monthsBetween(s, e)
     const total = (e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)
-    return { timelineStart: s, timelineEnd: e, months: ms, totalDays: total }
+    return { timelineStart: s, months: ms, totalDays: total }
   }, [tasks])
 
   function dayOffset(dateStr: string) {
@@ -97,8 +150,9 @@ export default function SchedulePage() {
 
   async function handleAdd() {
     if (!newName || !newStart || !newEnd) { alert("Name, start and end dates are required"); return }
+    if (!missionId) { alert("No mission found in Supabase"); return }
     const { error } = await supabase.from("schedule_tasks").insert({
-      mission_id: MISSION_ID,
+      mission_id: missionId,
       name: newName,
       start_date: newStart,
       end_date: newEnd,

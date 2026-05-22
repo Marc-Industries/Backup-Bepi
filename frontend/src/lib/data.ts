@@ -4,9 +4,8 @@ import {
   computeBudgetSummary
 } from "./mock-data";
 import type { Mission, ProductTreeNode, Requirement, Risk, ScheduleTask, BudgetSummary } from "./types";
+import { resolveActiveMissionId } from "./active-mission";
 export type { Mission };
-
-const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 
 // ---------------------------------------------------------------------------
 // Generic fetch with mock fallback
@@ -15,18 +14,23 @@ const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 async function fetchOrFallback<T>(
   table: string,
   fallback: T[],
-  mapper?: (row: Record<string, unknown>) => T
+  mapper?: (row: Record<string, unknown>) => T,
+  missionId?: string | null,
 ): Promise<T[]> {
   if (!hasSupabase) return fallback;
   try {
+    const activeMissionId = missionId ?? await resolveActiveMissionId();
+    if (!activeMissionId) return fallback;
     const { data, error } = await supabase
       .from(table)
       .select("*")
-      .eq("mission_id", MISSION_ID);
-    if (error || !data || data.length === 0) return fallback;
+      .eq("mission_id", activeMissionId);
+    // If we have a real mission but the table is empty, return empty rather than demo data.
+    if (error || !data) return [];
+    if (data.length === 0) return [];
     return mapper ? data.map(mapper) : (data as T[]);
   } catch {
-    return fallback;
+    return [];
   }
 }
 
@@ -37,10 +41,12 @@ async function fetchOrFallback<T>(
 export async function getMission(): Promise<Mission> {
   if (!hasSupabase) return DEMO_MISSION;
   try {
+    const activeMissionId = await resolveActiveMissionId();
+    if (!activeMissionId) return DEMO_MISSION;
     const { data, error } = await supabase
       .from("missions")
       .select("*")
-      .eq("id", MISSION_ID)
+      .eq("id", activeMissionId)
       .single();
     if (error || !data) return DEMO_MISSION;
     return {
@@ -67,6 +73,7 @@ export async function getMission(): Promise<Mission> {
 // ---------------------------------------------------------------------------
 
 export async function getProductTree(): Promise<ProductTreeNode[]> {
+  const activeMissionId = await resolveActiveMissionId();
   return fetchOrFallback<ProductTreeNode>("product_tree_nodes", DEMO_PRODUCT_TREE, (r) => ({
     id: r.id as string,
     mission_id: r.mission_id as string,
@@ -80,7 +87,7 @@ export async function getProductTree(): Promise<ProductTreeNode[]> {
     trl: (r.trl as number) ?? 0,
     mait_status: null,
     created_at: r.created_at as string,
-  }));
+  }), activeMissionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +105,7 @@ export async function getBudgetSummary(mission?: Mission): Promise<BudgetSummary
 // ---------------------------------------------------------------------------
 
 export async function getRequirements(): Promise<Requirement[]> {
+  const activeMissionId = await resolveActiveMissionId();
   return fetchOrFallback<Requirement>("requirements", DEMO_REQUIREMENTS, (r) => ({
     id: r.id as string,
     mission_id: r.mission_id as string,
@@ -111,7 +119,7 @@ export async function getRequirements(): Promise<Requirement[]> {
     allocated_to: null,
     parent_req_id: (r.parent_id as string) ?? null,
     created_at: r.created_at as string,
-  }));
+  }), activeMissionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +127,7 @@ export async function getRequirements(): Promise<Requirement[]> {
 // ---------------------------------------------------------------------------
 
 export async function getRisks(): Promise<Risk[]> {
+  const activeMissionId = await resolveActiveMissionId();
   return fetchOrFallback<Risk>("risks", DEMO_RISKS, (r) => ({
     id: r.id as string,
     mission_id: r.mission_id as string,
@@ -132,7 +141,7 @@ export async function getRisks(): Promise<Risk[]> {
     mitigation: (r.mitigation_strategy as string) ?? "",
     owner: (r.owner as string) ?? "",
     created_at: r.created_at as string,
-  }));
+  }), activeMissionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +149,7 @@ export async function getRisks(): Promise<Risk[]> {
 // ---------------------------------------------------------------------------
 
 export async function getTasks(): Promise<ScheduleTask[]> {
+  const activeMissionId = await resolveActiveMissionId();
   return fetchOrFallback<ScheduleTask>("schedule_tasks", DEMO_TASKS, (r) => ({
     id: r.id as string,
     mission_id: r.mission_id as string,
@@ -151,5 +161,5 @@ export async function getTasks(): Promise<ScheduleTask[]> {
     predecessors: [],
     milestone: (r.is_milestone as boolean) ?? false,
     created_at: r.created_at as string,
-  }));
+  }), activeMissionId);
 }

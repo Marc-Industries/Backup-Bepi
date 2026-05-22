@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,13 +16,23 @@ import {
 import { supabase } from "@/lib/supabase"
 import { DEMO_PRODUCT_TREE } from "@/lib/mock-data"
 import type { ProductTreeNode } from "@/lib/types"
+import { resolveActiveMissionId } from "@/lib/active-mission"
 
-const MISSION_ID = "00000000-0000-0000-0000-000000000001"
 const NODE_TYPES = ["spacecraft", "subsystem", "equipment", "component"] as const
-const MAIT_STATUSES = ["BB", "EM", "QM", "FM"] as const
 
 const inputClass = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
 const labelClass = "text-xs font-medium text-muted-foreground"
+
+type ProductTreeNodeRow = {
+  id: string
+  mission_id: string
+  parent_id: string | null
+  name: string
+  level: string
+  trl: number | null
+  quantity: number | null
+  created_at: string | null
+}
 
 function trlColor(trl: number) {
   if (trl >= 8) return "text-emerald-400"
@@ -117,8 +127,44 @@ function TreeNode({
 }
 
 export default function ProductTreePage() {
+  const [missionId, setMissionId] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  const tree = DEMO_PRODUCT_TREE
+  const [tree, setTree] = useState<ProductTreeNode[]>(DEMO_PRODUCT_TREE)
+
+  useEffect(() => {
+    (async () => {
+      const activeId = await resolveActiveMissionId()
+      setMissionId(activeId)
+      if (!activeId) return
+
+      const { data, error } = await supabase
+        .from("product_tree_nodes")
+        .select("*")
+        .eq("mission_id", activeId)
+        .order("created_at", { ascending: true })
+
+      if (error) return
+      if (!data) return
+
+      const mapped: ProductTreeNode[] = (data as unknown as ProductTreeNodeRow[]).map((r) => ({
+        id: r.id,
+        mission_id: r.mission_id,
+        parent_id: r.parent_id ?? null,
+        name: r.name,
+        node_type: r.level === "satellite" ? "spacecraft" : (r.level as ProductTreeNode["node_type"]),
+        mass_kg: 0,
+        power_w: 0,
+        qty: r.quantity ?? 1,
+        maturity_margin: 0,
+        trl: r.trl ?? 0,
+        mait_status: null,
+        created_at: r.created_at ?? "",
+      }))
+
+      setTree(mapped)
+    })()
+  }, [])
+
   const childrenMap = useMemo(() => buildTree(tree), [tree])
   const roots = childrenMap.get(null) ?? []
 
@@ -138,7 +184,6 @@ export default function ProductTreePage() {
   const [newTrl, setNewTrl] = useState(5)
   const [newQty, setNewQty] = useState(1)
   const [newMass, setNewMass] = useState(0)
-  const [newPower, setNewPower] = useState(0)
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -148,8 +193,9 @@ export default function ProductTreePage() {
 
   async function handleAdd() {
     if (!newName) { alert("Name is required"); return }
+    if (!missionId) { alert("No mission found in Supabase"); return }
     const { error } = await supabase.from("product_tree_nodes").insert({
-      mission_id: MISSION_ID,
+      mission_id: missionId,
       name: newName,
       level: newType === "spacecraft" ? "satellite" : newType,
       parent_id: newParent || null,

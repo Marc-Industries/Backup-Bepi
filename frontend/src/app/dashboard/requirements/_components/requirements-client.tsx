@@ -22,9 +22,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import { resolveActiveMissionId } from "@/lib/active-mission";
 import type { Requirement } from "@/lib/types";
-
-const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 
 const REQ_TYPES = ["all", "functional", "performance", "interface", "environmental", "operational", "design"] as const;
 const STATUSES = ["all", "draft", "active", "verified", "deleted"] as const;
@@ -85,8 +84,10 @@ export function RequirementsClient({
 
   async function handleAdd() {
     if (!newReqId || !newTitle) { alert("Req ID and Title are required"); return; }
+    const missionId = await resolveActiveMissionId();
+    if (!missionId) { alert("No mission found in Supabase"); return; }
     const { error } = await supabase.from("requirements").insert({
-      mission_id: MISSION_ID,
+      mission_id: missionId,
       req_id: newReqId,
       title: newTitle,
       text: newText,

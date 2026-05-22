@@ -1,7 +1,9 @@
 import streamlit as st
 import hashlib
+from postgrest.exceptions import APIError
 from bepi.role_permissions import ROLES
-from bepi.supabase_client import get_supabase
+from bepi.supabase_client import get_supabase, get_service_client
+from bepi.db_loader import load_missions_for_user
 from bepi.db_writer import add_mission
 from bepi.seed import seed_demo_mission, mock_tasks, mock_requirements, mock_risks, mock_product_tree_flat, mock_fmeca
 
@@ -60,15 +62,34 @@ DEMO_SAMPLE_SCOPES = {
 
 def _user_has_missions(user_id: str) -> list[dict]:
     """Check if user is member of any mission. Returns list of (mission_id, role) pairs."""
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     if not client or not user_id:
         return []
-    result = client.table("mission_members").select("mission_id, role").eq("user_id", user_id).eq("is_active", True).execute()
-    return result.data or []
+    try:
+        result = (
+            client.table("mission_members")
+            .select("mission_id, role")
+            .eq("user_id", user_id)
+            .eq("is_active", True)
+            .execute()
+        )
+        return result.data or []
+    except APIError as e:
+        # Common Supabase misconfiguration: RLS policy calls a helper function
+        # without granting EXECUTE to the authenticated role.
+        if (e.args and isinstance(e.args[0], dict) and e.args[0].get("code") == "42501"):
+            st.error(
+                "Supabase policy error: permission denied for function `is_mission_member`.\n\n"
+                "Fix in Supabase SQL (example):\n"
+                "- `grant execute on function public.is_mission_member(uuid, uuid) to authenticated;`\n"
+                "Then re-run the app."
+            )
+            return []
+        raise
 
 
 def _check_invitation(code: str) -> dict | None:
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     if not client:
         return None
     result = client.table("invitations").select("*, missions(name)").eq("code", code).execute()
@@ -81,7 +102,7 @@ def _check_invitation(code: str) -> dict | None:
 
 
 def _redeem_invitation(inv: dict, user_id: str) -> bool:
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     if not client:
         return False
     client.table("invitations").update({"used_at": "now()", "used_by": user_id}).eq("id", inv["id"]).execute()
@@ -96,7 +117,7 @@ def _redeem_invitation(inv: dict, user_id: str) -> bool:
 
 def _create_invitation(mission_id: str, role: str, subsystem: str | None, email: str | None) -> str:
     code = _generate_invite_code()
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     if not client:
         return code
     client.table("invitations").insert({
@@ -126,7 +147,7 @@ def render_onboarding():
     user_id = user.get("id")
     
     if user_id and not user.get("role"):
-        client = get_supabase()
+        client = get_service_client() or get_supabase()
         if client:
             try:
                 result = client.table("mission_members").select("role").eq("user_id", user_id).execute()
@@ -889,15 +910,14 @@ def _skip_onboarding():
 
 def _load_user_missions(user_id: str):
     """Load all missions user is a member of."""
-    client = get_supabase()
-    if not client:
-        return
-    result = client.table("missions").select("*").execute()
-    all_missions = {m["id"]: m for m in result.data or []}
+    missions = load_missions_for_user(user_id)
+    all_missions = {m["id"]: m for m in missions if m.get("id")}
     st.session_state.missions = all_missions
     st.session_state.active_mission_id = next(iter(all_missions), None)
-    
-    _sync_team_members_from_db(client, user_id)
+
+    client = get_service_client() or get_supabase()
+    if client:
+        _sync_team_members_from_db(client, user_id)
 
 
 def _sync_team_members_from_db(client, user_id: str):

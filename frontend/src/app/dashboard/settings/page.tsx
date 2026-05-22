@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@supabase/supabase-js";
+import { resolveActiveMissionId } from "@/lib/active-mission";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const supabase = supabaseUrl ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 
 interface MissionForm {
   name: string;
@@ -22,6 +21,25 @@ interface MissionForm {
   mass_limit_kg: number;
   power_limit_w: number;
   propellant_mass_kg: number;
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
 }
 
 const DEFAULTS: MissionForm = {
@@ -43,25 +61,27 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase
-      .from("missions")
-      .select("*")
-      .eq("id", MISSION_ID)
-      .single()
-      .then(({ data }) => {
-        if (!data) return;
-        setForm({
-          name: data.name ?? DEFAULTS.name,
-          description: data.description ?? DEFAULTS.description,
-          phase: data.phase ?? DEFAULTS.phase,
-          orbit: data.orbit_type ?? DEFAULTS.orbit,
-          target_launch: data.target_launch_date ?? DEFAULTS.target_launch,
-          lifetime_years: data.lifetime_years ?? DEFAULTS.lifetime_years,
-          mass_limit_kg: data.mass_limit_kg ?? DEFAULTS.mass_limit_kg,
-          power_limit_w: data.power_limit_w ?? DEFAULTS.power_limit_w,
-          propellant_mass_kg: data.propellant_mass_kg ?? DEFAULTS.propellant_mass_kg,
-        });
+    (async () => {
+      const missionId = await resolveActiveMissionId();
+      if (!missionId) return;
+      const { data } = await supabase
+        .from("missions")
+        .select("*")
+        .eq("id", missionId)
+        .single();
+      if (!data) return;
+      setForm({
+        name: data.name ?? DEFAULTS.name,
+        description: data.description ?? DEFAULTS.description,
+        phase: data.phase ?? DEFAULTS.phase,
+        orbit: data.orbit_type ?? DEFAULTS.orbit,
+        target_launch: data.target_launch_date ?? DEFAULTS.target_launch,
+        lifetime_years: data.lifetime_years ?? DEFAULTS.lifetime_years,
+        mass_limit_kg: data.mass_limit_kg ?? DEFAULTS.mass_limit_kg,
+        power_limit_w: data.power_limit_w ?? DEFAULTS.power_limit_w,
+        propellant_mass_kg: data.propellant_mass_kg ?? DEFAULTS.propellant_mass_kg,
       });
+    })();
   }, []);
 
   function set(key: keyof MissionForm, value: string | number) {
@@ -71,6 +91,8 @@ export default function SettingsPage() {
 
   async function handleSave() {
     if (!supabase) return;
+    const missionId = await resolveActiveMissionId();
+    if (!missionId) { alert("No mission found in Supabase"); return; }
     setSaving(true);
     await supabase
       .from("missions")
@@ -85,18 +107,9 @@ export default function SettingsPage() {
         power_limit_w: form.power_limit_w,
         propellant_mass_kg: form.propellant_mass_kg,
       })
-      .eq("id", MISSION_ID);
+      .eq("id", missionId);
     setSaving(false);
     setSaved(true);
-  }
-
-  function Field({ label, value, onChange, type = "text" }: { label: string; value: string | number; onChange: (v: string) => void; type?: string }) {
-    return (
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
-      </div>
-    );
   }
 
   return (
@@ -133,7 +146,7 @@ export default function SettingsPage() {
           {saving ? "Saving..." : "Save Changes"}
         </Button>
         {saved && <span className="text-sm text-green-600">Saved successfully</span>}
-        {!supabase && <span className="text-sm text-muted-foreground">Supabase not configured -- changes won't persist</span>}
+        {!supabase && <span className="text-sm text-muted-foreground">Supabase not configured -- changes {"won't"} persist</span>}
       </div>
     </div>
   );

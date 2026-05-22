@@ -9,8 +9,19 @@ def get_supabase() -> Client | None:
     if not url:
         return None
     client: Client = create_client(url, key)
-    if "supabase_token" in st.session_state:
-        client.session_token = st.session_state["supabase_token"]
+    access_token = st.session_state.get("supabase_token")
+    refresh_token = st.session_state.get("supabase_refresh_token")
+    if access_token and refresh_token:
+        # Ensure PostgREST requests are authenticated; setting `session_token`
+        # is not enough for supabase-py >= 2.x.
+        try:
+            client.auth.set_session(access_token, refresh_token)
+        except Exception:
+            pass
+        try:
+            client.postgrest.auth(access_token)
+        except Exception:
+            pass
     return client
 
 

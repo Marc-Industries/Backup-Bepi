@@ -22,9 +22,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import { resolveActiveMissionId } from "@/lib/active-mission";
 import type { Risk } from "@/lib/types";
-
-const MISSION_ID = "00000000-0000-0000-0000-000000000001";
 const RISK_STATUSES = ["open", "mitigated", "accepted", "closed"] as const;
 const RISK_CATEGORIES = ["technical", "schedule", "cost", "programmatic", "environmental"] as const;
 
@@ -60,8 +59,10 @@ export function RiskTable({ risks }: { risks: Risk[] }) {
 
   async function handleAdd() {
     if (!newRiskId || !newTitle) { alert("Risk ID and Title are required"); return; }
+    const missionId = await resolveActiveMissionId();
+    if (!missionId) { alert("No mission found in Supabase"); return; }
     const { error } = await supabase.from("risks").insert({
-      mission_id: MISSION_ID,
+      mission_id: missionId,
       risk_id: newRiskId,
       title: newTitle,
       description: newDesc,

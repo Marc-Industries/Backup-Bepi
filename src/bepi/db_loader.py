@@ -1,14 +1,55 @@
 import streamlit as st
-from bepi.supabase_client import get_supabase
+from postgrest.exceptions import APIError
+from bepi.supabase_client import get_supabase, get_service_client
 
 
 def load_missions_for_user(user_id: str) -> list[dict]:
+    if not user_id:
+        return []
+
+    service = get_service_client()
+    if service:
+        try:
+            mm = (
+                service.table("mission_members")
+                .select("mission_id, role, subsystem")
+                .eq("user_id", user_id)
+                .eq("is_active", True)
+                .execute()
+            ).data or []
+            mission_ids = [r.get("mission_id") for r in mm if r.get("mission_id")]
+            if not mission_ids:
+                return []
+            missions = (
+                service.table("missions")
+                .select("*")
+                .in_("id", mission_ids)
+                .execute()
+            ).data or []
+            mm_by_id = {r.get("mission_id"): r for r in mm}
+            for m in missions:
+                member = mm_by_id.get(m.get("id")) or {}
+                m["mission_members"] = [{"role": member.get("role"), "subsystem": member.get("subsystem")}]
+            return missions
+        except Exception:
+            return []
+
     client = get_supabase()
     if not client:
         return []
 
-    result = client.table("missions").select("*, mission_members(role, subsystem)").execute()
-    return result.data or []
+    try:
+        result = client.table("missions").select("*, mission_members(role, subsystem)").execute()
+        return result.data or []
+    except APIError as e:
+        if (e.args and isinstance(e.args[0], dict) and e.args[0].get("code") == "42501"):
+            st.error(
+                "Supabase policy error: permission denied for function `is_mission_member`.\n\n"
+                "Fix in Supabase SQL (example):\n"
+                "- `grant execute on function public.is_mission_member(uuid, uuid) to authenticated;`"
+            )
+            return []
+        raise
 
 
 def load_mission_members(mission_id: str) -> list[dict]:

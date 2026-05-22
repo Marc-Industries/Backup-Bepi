@@ -24,16 +24,16 @@ function PieChart({
   const cy = size / 2;
   const r = 70;
 
-  let cumAngle = -Math.PI / 2;
+  const angles = data.map((d) => (d.value / total) * 2 * Math.PI);
   const slices = data.map((d, i) => {
-    const angle = (d.value / total) * 2 * Math.PI;
-    const startX = cx + r * Math.cos(cumAngle);
-    const startY = cy + r * Math.sin(cumAngle);
-    const endX = cx + r * Math.cos(cumAngle + angle);
-    const endY = cy + r * Math.sin(cumAngle + angle);
+    const angle = angles[i] ?? 0;
+    const startAngle = -Math.PI / 2 + angles.slice(0, i).reduce((s, a) => s + a, 0);
+    const startX = cx + r * Math.cos(startAngle);
+    const startY = cy + r * Math.sin(startAngle);
+    const endX = cx + r * Math.cos(startAngle + angle);
+    const endY = cy + r * Math.sin(startAngle + angle);
     const largeArc = angle > Math.PI ? 1 : 0;
     const path = `M ${cx} ${cy} L ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY} Z`;
-    cumAngle += angle;
     return { path, color: COLORS[i % COLORS.length], label: d.label, value: d.value };
   });
 

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getRisks } from "@/lib/data";
 import { RiskMatrix } from "./_components/risk-matrix";
 import { RiskTable } from "./_components/risk-table";
