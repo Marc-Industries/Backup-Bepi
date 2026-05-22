@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
+const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")
+const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "matteo.marcon24@gmail.com"
 const BEPI_URL = Deno.env.get("BEPI_URL") || "https://bepi-space.streamlit.app"
 
 const corsHeaders = {
@@ -27,9 +28,9 @@ serve(async (req) => {
       )
     }
 
-    if (!RESEND_API_KEY) {
+    if (!SENDGRID_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "RESEND_API_KEY not configured" }),
+        JSON.stringify({ error: "SENDGRID_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
@@ -94,32 +95,31 @@ serve(async (req) => {
 </body>
 </html>`
 
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "BEPI Space <onboarding@resend.dev>",
-        to: [recipient_email],
+        personalizations: [{ to: [{ email: recipient_email, name: recipient_name || "" }] }],
+        from: { email: SENDER_EMAIL, name: "BEPI Space" },
         subject: `You're invited to join ${mission_name} on BEPI`,
-        html: emailHtml,
+        content: [{ type: "text/html", value: emailHtml }],
       }),
     })
 
-    const data = await res.json()
-
     if (!res.ok) {
-      console.error("Resend error:", data)
+      const data = await res.json().catch(() => ({}))
+      console.error("SendGrid error:", data)
       return new Response(
-        JSON.stringify({ error: data.message || "Failed to send email" }),
+        JSON.stringify({ error: data.errors?.[0]?.message || "Failed to send email" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
 
     return new Response(
-      JSON.stringify({ success: true, email_id: data.id }),
+      JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (err) {
