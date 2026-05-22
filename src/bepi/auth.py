@@ -1,6 +1,18 @@
 import streamlit as st
 from bepi.supabase_client import get_supabase
 
+_COOKIE_TOKEN = "bepi_token"
+_COOKIE_REFRESH = "bepi_refresh"
+_COOKIE_MAX_AGE = 86400 * 7  # 7 days
+
+
+def _cookie_ctrl():
+    try:
+        from streamlit_cookies_controller import CookieController
+        return CookieController(key="bepi_auth")
+    except Exception:
+        return None
+
 
 def _user_dict(user) -> dict:
     return {
@@ -11,7 +23,41 @@ def _user_dict(user) -> dict:
     }
 
 
+def _restore_from_cookie(cc) -> bool:
+    """Try to restore session from browser cookies. Returns True if restored."""
+    if "user" in st.session_state:
+        return True
+    token = cc.get(_COOKIE_TOKEN)
+    refresh = cc.get(_COOKIE_REFRESH)
+    if not token or not refresh:
+        return False
+    client = get_supabase()
+    if not client:
+        return False
+    try:
+        result = client.auth.set_session(token, refresh)
+        if result and result.user:
+            st.session_state["user"] = _user_dict(result.user)
+            st.session_state["supabase_token"] = result.session.access_token
+            st.session_state["supabase_refresh_token"] = result.session.refresh_token
+            return True
+    except Exception:
+        # Token expired or invalid — clear cookies and force login
+        try:
+            cc.remove(_COOKIE_TOKEN)
+            cc.remove(_COOKIE_REFRESH)
+        except Exception:
+            pass
+    return False
+
+
 def render_auth_ui():
+    cc = _cookie_ctrl()
+
+    # Try cookie-based session restore (survives F5 / hard refresh)
+    if cc and _restore_from_cookie(cc):
+        return st.session_state.get("user")
+
     if "user" in st.session_state:
         return st.session_state["user"]
 
@@ -103,6 +149,9 @@ def render_auth_ui():
                         st.session_state["user"] = _user_dict(result.user)
                         st.session_state["supabase_token"] = result.session.access_token
                         st.session_state["supabase_refresh_token"] = result.session.refresh_token
+                        if cc:
+                            cc.set(_COOKIE_TOKEN, result.session.access_token, max_age=_COOKIE_MAX_AGE)
+                            cc.set(_COOKIE_REFRESH, result.session.refresh_token, max_age=_COOKIE_MAX_AGE)
                         st.rerun()
                     else:
                         st.error("❌ Invalid credentials")
@@ -144,15 +193,21 @@ def render_auth_ui():
 
 
 def logout():
-    if "user" in st.session_state:
-        client = get_supabase()
+    cc = _cookie_ctrl()
+    if cc:
         try:
-            client.auth.sign_out()
+            cc.remove(_COOKIE_TOKEN)
+            cc.remove(_COOKIE_REFRESH)
         except Exception:
             pass
-        for k in ["user", "supabase_token", "supabase_refresh_token"]:
-            st.session_state.pop(k, None)
-        st.rerun()
+    client = get_supabase()
+    try:
+        client.auth.sign_out()
+    except Exception:
+        pass
+    for k in ["user", "supabase_token", "supabase_refresh_token"]:
+        st.session_state.pop(k, None)
+    st.rerun()
 
 
 def get_current_user() -> dict | None:
