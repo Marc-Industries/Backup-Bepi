@@ -98,7 +98,8 @@ def invite_team_member(mission_id: str, email: str, full_name: str, role: str, s
     
     Nessun servizio SMTP esterno richiesto - tutto è gestito via Supabase!
     """
-    client = get_supabase()
+    # Use service client when available to avoid RLS issues for server-side actions.
+    client = get_service_client() or get_supabase()
     if not client:
         raise RuntimeError("Supabase client not available")
 
@@ -148,4 +149,3 @@ def invite_team_member(mission_id: str, email: str, full_name: str, role: str, s
         "email_sent": email_sent,  # Indica se email è stata inviata
         "email_result": email_result,
     }
-

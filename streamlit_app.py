@@ -39,7 +39,7 @@ from bepi.ecss.reviews import REVIEW_DEFINITIONS
 from bepi.services.reports import generate_report
 from bepi.auth import render_auth_ui, logout, get_current_user
 from bepi.role_permissions import ROLES, ROLE_PERMISSION_LABELS, can, require, can_edit_node, can_modify_product_tree
-from bepi.supabase_client import get_supabase
+from bepi.supabase_client import get_supabase, get_service_client
 from bepi.db_loader import load_mission_data, load_missions_for_user, load_mission_members
 from bepi.db_writer import (
     add_mission, delete_mission, add_requirement, update_requirement, delete_requirement,
@@ -54,9 +54,17 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
     """Process product tree actions and save to DB."""
     from bepi.role_permissions import can
     
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     mission_id = st.session_state.get("active_mission_id")
     _role = st.session_state.get("user", {}).get("role", "USER")
+
+    def _parent_uuid(parent_id: str | None) -> str | None:
+        if not parent_id:
+            return None
+        for n in st.session_state.get("product_tree", []):
+            if str(n.get("id")) == str(parent_id) or str(n.get("uuid")) == str(parent_id):
+                return str(n.get("uuid") or n.get("id"))
+        return str(parent_id)
     
     if action == "add_node":
         if _role == "ADMIN" or can("edit_subsystem") or can("edit_budget"):
@@ -65,6 +73,7 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                 try:
                     result = client.table("product_tree_nodes").insert({
                         "mission_id": mission_id,
+                        "parent_id": _parent_uuid(data.get("parent_id")),
                         "level": data.get("level", "subsystem"),
                         "code": data.get("code", ""),
                         "name": data.get("name", ""),
@@ -91,8 +100,8 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                                 client.table("budgets").insert({
                                     "node_id": node_uuid, "budget_type": "power_w", "nominal_value": 0.0, "unit": "W", "maturity": "estimate"
                                 }).execute()
-                            except:
-                                pass
+                            except Exception as e:
+                                st.warning(f"Budget row insert failed: {e}")
                 except Exception as e:
                     st.error(f"Add Error: {e}")
     
@@ -948,7 +957,7 @@ def _get_product_tree(force_reload=False):
         st.session_state["product_tree"] = []
     
     # Always try to load from DB to get latest data
-    client = get_supabase()
+    client = get_service_client() or get_supabase()
     mission_id = st.session_state.get("active_mission_id")
     
     if DB_ENFORCED and not client:
@@ -994,7 +1003,7 @@ def _get_equip_budgets():
     
     # Load budgets from DB if session is empty
     if not st.session_state["equip_budgets"]:
-        client = get_supabase()
+        client = get_service_client() or get_supabase()
         mission_id = st.session_state.get("active_mission_id")
         
         if client and mission_id:
@@ -1819,9 +1828,17 @@ def page_product_tree():
         
         # ADMIN can do everything - no permission checks
         _role = st.session_state.get("user", {}).get("role", "USER")
-        client = get_supabase()
+        client = get_service_client() or get_supabase()
         mission_id = st.session_state.get("active_mission_id")
         st.write(f"DEBUG: client={client is not None}, mission_id={mission_id}")
+
+        def _parent_uuid(parent_id: str | None) -> str | None:
+            if not parent_id:
+                return None
+            for n in st.session_state.get("product_tree", []):
+                if str(n.get("id")) == str(parent_id) or str(n.get("uuid")) == str(parent_id):
+                    return str(n.get("uuid") or n.get("id"))
+            return str(parent_id)
         
         if action == "add_node":
             st.session_state["product_tree"].append(data)
@@ -1829,6 +1846,7 @@ def page_product_tree():
                 try:
                     result = client.table("product_tree_nodes").insert({
                         "mission_id": mission_id,
+                        "parent_id": _parent_uuid(data.get("parent_id")),
                         "level": data.get("level", "subsystem"),
                         "code": data.get("code", ""),
                         "name": data.get("name", ""),
@@ -1848,10 +1866,10 @@ def page_product_tree():
                             try:
                                 client.table("budgets").insert({"node_id": node_uuid, "budget_type": "mass_kg", "nominal_value": 0.0, "unit": "kg", "maturity": "estimate"}).execute()
                                 client.table("budgets").insert({"node_id": node_uuid, "budget_type": "power_w", "nominal_value": 0.0, "unit": "W", "maturity": "estimate"}).execute()
-                            except:
-                                pass
-                except:
-                    pass
+                            except Exception as e:
+                                st.warning(f"Budget row insert failed: {e}")
+                except Exception as e:
+                    st.error(f"DB insert failed (product_tree_nodes): {e}")
         
         elif action == "delete_node":
             node_id = data.get("id")
