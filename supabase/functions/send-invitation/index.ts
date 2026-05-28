@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 
-const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY")
+const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY")
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "matteo.marcon24@gmail.com"
 const BEPI_URL = Deno.env.get("BEPI_URL") || "https://bepi-space.streamlit.app"
 
@@ -28,9 +28,9 @@ serve(async (req) => {
       )
     }
 
-    if (!SENDGRID_API_KEY) {
+    if (!BREVO_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "SENDGRID_API_KEY not configured" }),
+        JSON.stringify({ error: "BREVO_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
@@ -95,25 +95,25 @@ serve(async (req) => {
 </body>
 </html>`
 
-    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+        "api-key": BREVO_API_KEY!,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: recipient_email, name: recipient_name || "" }] }],
-        from: { email: SENDER_EMAIL, name: "BEPI Space" },
+        sender: { name: "BEPI Space", email: SENDER_EMAIL },
+        to: [{ email: recipient_email, name: recipient_name || "" }],
         subject: `You're invited to join ${mission_name} on BEPI`,
-        content: [{ type: "text/html", value: emailHtml }],
+        htmlContent: emailHtml,
       }),
     })
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      console.error("SendGrid error:", data)
+      console.error("Brevo error:", data)
       return new Response(
-        JSON.stringify({ error: data.errors?.[0]?.message || "Failed to send email" }),
+        JSON.stringify({ error: data.message || "Failed to send email" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
     }
