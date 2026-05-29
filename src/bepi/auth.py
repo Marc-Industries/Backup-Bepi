@@ -23,9 +23,28 @@ def _user_dict(user) -> dict:
     }
 
 
+def _sync_cookie_from_state(cc) -> None:
+    """Persist the freshest session tokens to cookies. Supabase rotates refresh
+    tokens on every refresh, so the cookie must follow the rotation — otherwise
+    the next hard refresh reads a stale/consumed token and logs the user out."""
+    tok = st.session_state.get("supabase_token")
+    ref = st.session_state.get("supabase_refresh_token")
+    if not tok or not ref:
+        return
+    try:
+        if cc.get(_COOKIE_TOKEN) != tok or cc.get(_COOKIE_REFRESH) != ref:
+            cc.set(_COOKIE_TOKEN, tok, max_age=_COOKIE_MAX_AGE)
+            cc.set(_COOKIE_REFRESH, ref, max_age=_COOKIE_MAX_AGE)
+    except Exception:
+        pass
+
+
 def _restore_from_cookie(cc) -> bool:
     """Try to restore session from browser cookies. Returns True if restored."""
     if "user" in st.session_state:
+        # Already authenticated this session — keep the cookie in sync with any
+        # token rotation that happened during the previous run (get_supabase).
+        _sync_cookie_from_state(cc)
         return True
     token = cc.get(_COOKIE_TOKEN)
     refresh = cc.get(_COOKIE_REFRESH)
@@ -40,6 +59,9 @@ def _restore_from_cookie(cc) -> bool:
             st.session_state["user"] = _user_dict(result.user)
             st.session_state["supabase_token"] = result.session.access_token
             st.session_state["supabase_refresh_token"] = result.session.refresh_token
+            # set_session may have refreshed/rotated the tokens — persist the new
+            # ones back to the cookie so the session stays durable across refreshes.
+            _sync_cookie_from_state(cc)
             return True
     except Exception:
         # Token expired or invalid — clear cookies and force login

@@ -14,12 +14,24 @@ def get_supabase() -> Client | None:
     if access_token and refresh_token:
         # Ensure PostgREST requests are authenticated; setting `session_token`
         # is not enough for supabase-py >= 2.x.
+        # set_session() auto-refreshes an expired access token and rotates the
+        # refresh token — capture the result so we persist the fresh tokens and
+        # use the fresh access token for PostgREST (otherwise queries silently
+        # fail with a stale/expired JWT after ~1h).
+        fresh_access = access_token
         try:
-            client.auth.set_session(access_token, refresh_token)
+            res = client.auth.set_session(access_token, refresh_token)
+            sess = getattr(res, "session", None)
+            if sess:
+                if sess.access_token:
+                    fresh_access = sess.access_token
+                    st.session_state["supabase_token"] = sess.access_token
+                if sess.refresh_token:
+                    st.session_state["supabase_refresh_token"] = sess.refresh_token
         except Exception:
             pass
         try:
-            client.postgrest.auth(access_token)
+            client.postgrest.auth(fresh_access)
         except Exception:
             pass
     return client

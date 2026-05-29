@@ -1021,7 +1021,7 @@ def _get_equip_budgets():
                                 "trl": 1
                             }
             except Exception as e:
-                pass
+                st.error(f"Caricamento budget dal DB fallito: {e}")
     
     return st.session_state["equip_budgets"]
 
@@ -1785,145 +1785,6 @@ def page_product_tree():
     flat = _get_product_tree()
     eb = _get_equip_budgets()
     
-    # --- Query Params Bridge (JS -> Python) ---
-    action = None
-    data = None
-
-    if "pt_action" in st.query_params:
-        action_val = st.query_params.get("pt_action")
-        action = action_val[0] if isinstance(action_val, (list, tuple)) else action_val
-        data_val = st.query_params.get("pt_data", "{}")
-        data_str = data_val[0] if isinstance(data_val, (list, tuple)) else data_val
-        try:
-            data = json.loads(urllib.parse.unquote(data_str))
-        except Exception:
-            data = {}
-
-        _role = st.session_state.get("user", {}).get("role", "USER")
-        client = get_service_client() or get_supabase()
-        mission_id = st.session_state.get("active_mission_id")
-
-        def _parent_uuid(parent_id: str | None) -> str | None:
-            if not parent_id:
-                return None
-            for n in st.session_state.get("product_tree", []):
-                if str(n.get("id")) == str(parent_id) or str(n.get("uuid")) == str(parent_id):
-                    return str(n.get("uuid") or n.get("id"))
-            return str(parent_id)
-        
-        if action == "add_node":
-            st.session_state["product_tree"].append(data)
-            if client and mission_id:
-                try:
-                    result = client.table("product_tree_nodes").insert({
-                        "mission_id": mission_id,
-                        "parent_id": _parent_uuid(data.get("parent_id")),
-                        "level": data.get("level", "subsystem"),
-                        "code": data.get("code", ""),
-                        "name": data.get("name", ""),
-                        "subsystem_type": data.get("subsystem_type"),
-                        "is_leaf": data.get("is_leaf", False),
-                        "quantity": data.get("quantity", 1),
-                        "trl": data.get("trl", 1),
-                        "status": data.get("status", "proposed"),
-                    }).execute()
-                    if result.data:
-                        inserted = result.data[0]
-                        if inserted.get("id"):
-                            st.session_state["product_tree"][-1]["uuid"] = inserted.get("id")
-                        if data.get("level") == "equipment":
-                            node_uuid = inserted.get("id")
-                            _get_equip_budgets()[data["code"]] = {"mass": 0.0, "power": 0, "qty": 1, "mat": "estimate", "trl": 1}
-                            try:
-                                client.table("budgets").insert({"node_id": node_uuid, "budget_type": "mass_kg", "nominal_value": 0.0, "unit": "kg", "maturity": "estimate"}).execute()
-                                client.table("budgets").insert({"node_id": node_uuid, "budget_type": "power_w", "nominal_value": 0.0, "unit": "W", "maturity": "estimate"}).execute()
-                            except Exception as e:
-                                st.warning(f"Budget row insert failed: {e}")
-                except Exception as e:
-                    st.error(f"DB insert failed (product_tree_nodes): {e}")
-        
-        elif action == "delete_node":
-            node_id = data.get("id")
-            to_delete = {str(node_id)}
-            changed = True
-            while changed:
-                changed = False
-                for n in st.session_state["product_tree"]:
-                    if str(n.get("parent_id")) in to_delete and str(n["id"]) not in to_delete:
-                        to_delete.add(str(n["id"]))
-                        changed = True
-            client = get_supabase()
-            if client:
-                try:
-                    for del_id in to_delete:
-                        for n in st.session_state.get("product_tree", []):
-                            if str(n.get("id")) == del_id:
-                                uuid_val = n.get("uuid") or n.get("id")
-                                if uuid_val:
-                                    client.table("budgets").delete().eq("node_id", uuid_val).execute()
-                                    client.table("product_tree_nodes").delete().eq("id", uuid_val).execute()
-                                break
-                except Exception as e:
-                    st.error(f"Eliminazione fallita: {e}")
-            st.session_state["product_tree"] = [n for n in st.session_state["product_tree"] if str(n["id"]) not in to_delete]
-
-        elif action == "edit_node":
-            node_id = data.get("id")
-            client = get_supabase()
-            for n in st.session_state["product_tree"]:
-                if str(n["id"]) == str(node_id):
-                    n["code"] = data.get("code", n["code"])
-                    n["name"] = data.get("name", n["name"])
-                    n["level"] = data.get("level", n.get("level"))
-                    n["parent_id"] = data.get("parentId", n.get("parent_id"))
-                    if client:
-                        try:
-                            uuid_val = n.get("uuid") or n.get("id")
-                            if uuid_val:
-                                client.table("product_tree_nodes").update({
-                                    "code": n["code"],
-                                    "name": n["name"],
-                                    "level": n["level"],
-                                    "subsystem_type": n.get("subsystem_type"),
-                                    "quantity": n.get("quantity", 1),
-                                    "trl": n.get("trl", 1),
-                                    "status": n.get("status", "proposed"),
-                                }).eq("id", uuid_val).execute()
-                        except Exception as e:
-                            st.error(f"Salvataggio nodo fallito: {e}")
-                    break
-
-        elif action == "update_item":
-            code = data.get("code")
-            if code in eb:
-                eb[code]["mass"] = float(data.get("mass", eb[code]["mass"]))
-                eb[code]["power"] = float(data.get("power", eb[code]["power"]))
-                eb[code]["qty"] = int(data.get("qty", eb[code]["qty"]))
-                eb[code]["mat"] = data.get("maturity", eb[code].get("mat", "estimate"))
-                client = get_supabase()
-                if client:
-                    try:
-                        for n in st.session_state.get("product_tree", []):
-                            if n.get("code") == code:
-                                node_uuid = n.get("uuid") or n.get("id")
-                                if node_uuid:
-                                    client.table("budgets").update({
-                                        "nominal_value": eb[code]["mass"],
-                                        "maturity": eb[code]["mat"],
-                                    }).eq("node_id", node_uuid).eq("budget_type", "mass_kg").execute()
-                                    client.table("budgets").update({
-                                        "nominal_value": eb[code]["power"],
-                                        "maturity": eb[code]["mat"],
-                                    }).eq("node_id", node_uuid).eq("budget_type", "power_w").execute()
-                                break
-                    except Exception as e:
-                        st.error(f"Aggiornamento budget fallito: {e}")
-
-        elif action == "nav_page":
-            st.session_state.current_page = data.get("page")
-        
-        if action:
-            st.query_params.clear()
 
     # --- Hide Streamlit chrome completely ---
     st.markdown("""
@@ -3018,33 +2879,36 @@ def page_budgets():
                         if node and node["name"] != row["Name"]:
                             node["name"] = row["Name"]
                         
-                        # 🔴 P0 FIX: Persist to DB if client available
+                        # Persist to DB if client available.
+                        # Update existing budget rows, insert only when none exist.
+                        # NOTE: do NOT use .upsert() here — the budgets table has no
+                        # UNIQUE(node_id, budget_type) constraint, so upsert resolves
+                        # on the PK (id) and inserts a brand-new row every save,
+                        # accumulating duplicates.
                         if client and node:
                             node_id = node.get("id")  # UUID
                             if node_id:
-                                # Upsert mass_kg budget
-                                client.table("budgets").upsert({
-                                    "node_id": node_id,
-                                    "budget_type": "mass_kg",
-                                    "nominal_value": mass_kg,
-                                    "unit": "kg",
-                                    "quantity": qty,
-                                    "maturity": mat,
-                                    "margin_pct": 0,
-                                    "source": "equipment_editor",
-                                }).execute()
-                                
-                                # Upsert power_w budget
-                                client.table("budgets").upsert({
-                                    "node_id": node_id,
-                                    "budget_type": "power_w",
-                                    "nominal_value": power_w,
-                                    "unit": "W",
-                                    "quantity": qty,
-                                    "maturity": mat,
-                                    "margin_pct": 0,
-                                    "source": "equipment_editor",
-                                }).execute()
+                                for btype, val, unit in [
+                                    ("mass_kg", mass_kg, "kg"),
+                                    ("power_w", power_w, "W"),
+                                ]:
+                                    res = client.table("budgets").update({
+                                        "nominal_value": val,
+                                        "quantity": qty,
+                                        "maturity": mat,
+                                        "source": "equipment_editor",
+                                    }).eq("node_id", node_id).eq("budget_type", btype).execute()
+                                    if not res.data:
+                                        client.table("budgets").insert({
+                                            "node_id": node_id,
+                                            "budget_type": btype,
+                                            "nominal_value": val,
+                                            "unit": unit,
+                                            "quantity": qty,
+                                            "maturity": mat,
+                                            "margin_pct": 0,
+                                            "source": "equipment_editor",
+                                        }).execute()
                     
                     st.success("✅ Budget saved to database!")
                 except Exception as e:
