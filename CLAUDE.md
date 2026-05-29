@@ -195,6 +195,16 @@ pytest --cov=bepi --cov-report=html
 
 ---
 
+## Bug Fixes & Root Causes (2026-05-29)
+
+- **Duplicati budget**: l'editor "Edit Equipment" salvava con `.upsert()` ma `budgets` non aveva vincolo UNIQUE → ogni Save inseriva una riga nuova invece di aggiornare. Fix: codice update-then-insert + vincolo `UNIQUE (node_id, budget_type)` su DB (migration in `supabase/migrations/`).
+- **Logout / perdita dati dopo ~1h**: `get_supabase()` non risalvava i token rinnovati e usava il JWT scaduto per PostgREST → query DB fallivano in silenzio e l'F5 sloggava. Fix: token freschi persistiti in session_state + riscritti nel cookie (`auth.py`).
+- **Logout su F5**: token ora salvati in cookie browser (`streamlit-cookies-controller`, 7gg) e ripristinati a ogni load.
+- **Email inviti**: Edge Function `send-invitation` su **Brevo** (300 mail/gg free). Fallback graceful: se l'email fallisce, il codice invito è mostrato nell'UI. Caveat: Brevo filtra per IP, lasciare vuota la allowlist (Supabase Edge Functions usano IP dinamici).
+- **Cleanup**: rimosse ~139 righe di codice morto (secondo handler product-tree mai eseguito).
+
+---
+
 ## Roadmap Futuro
 
 - **Fase 6**: Mobile app (React Native)
@@ -207,4 +217,4 @@ pytest --cov=bepi --cov-report=html
 ## Contributi
 
 Questo file DEVE essere aggiornato ad ogni cambiamento significativo.  
-Ultimo aggiornamento: Maggio 2026
+Ultimo aggiornamento: 29 Maggio 2026
