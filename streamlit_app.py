@@ -69,29 +69,41 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
     if action == "add_node":
         if _role == "ADMIN" or can("edit_subsystem") or can("edit_budget"):
             st.session_state["product_tree"].append(data)
+            # Mark we just added locally so the next reload doesn't clobber it
+            # before Supabase has a chance to return the new uuid.
+            st.session_state["_pt_just_added"] = {
+                "local_id": str(data.get("id", "")),
+                "code": data.get("code", ""),
+                "name": data.get("name", ""),
+                "level": data.get("level", "subsystem"),
+                "ts": __import__("time").time(),
+            }
             if client and mission_id:
                 try:
                     result = client.table("product_tree_nodes").insert({
                         "mission_id": mission_id,
                         "parent_id": _parent_uuid(data.get("parent_id")),
                         "level": data.get("level", "subsystem"),
-                        "code": data.get("code", ""),
-                        "name": data.get("name", ""),
+                        "code": str(data.get("code", "")),
+                        "name": str(data.get("name", "")),
                         "subsystem_type": data.get("subsystem_type"),
-                        "is_leaf": data.get("is_leaf", False),
-                        "quantity": data.get("quantity", 1),
-                        "trl": data.get("trl", 1),
+                        "is_leaf": bool(data.get("is_leaf", False)),
+                        "quantity": int(data.get("quantity", 1)),
+                        "trl": int(data.get("trl", 1)),
                         "status": data.get("status", "proposed"),
                     }).execute()
                     if result.data:
+                        new_uuid = str(result.data[0].get("id", ""))
                         for n in st.session_state["product_tree"]:
                             if str(n.get("id")) == str(data.get("id")):
-                                n["uuid"] = result.data[0].get("id")
+                                n["uuid"] = new_uuid
                                 break
-                        
+                        # Clear the "just added" marker — we have the real uuid now
+                        st.session_state.pop("_pt_just_added", None)
+
                         # Add budgets for equipment
                         if data.get("level") == "equipment":
-                            node_uuid = result.data[0].get("id")
+                            node_uuid = new_uuid
                             eb[data["code"]] = {"mass": 0.0, "power": 0, "qty": 1, "mat": "estimate", "trl": 1}
                             try:
                                 client.table("budgets").insert({
@@ -102,8 +114,12 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                                 }).execute()
                             except Exception as e:
                                 st.warning(f"Budget row insert failed: {e}")
+                    else:
+                        st.warning(f"⚠️ DB insert returned no rows for code={data.get('code')!r}. The node is kept locally but may not persist after refresh.")
                 except Exception as e:
                     st.error(f"Add Error: {e}")
+        else:
+            st.warning("You don't have permission to add components to the product tree.")
     
     elif action == "update_item":
         if _role == "ADMIN" or can("edit_budget") or can("edit_subsystem"):
@@ -971,6 +987,33 @@ def _get_product_tree(force_reload=False):
                 
                 # Only update if we have data from DB
                 if db_tree:
+                    # If we just added a node locally and the DB doesn't see it yet
+                    # (e.g. RLS lag, replication, or the row was just inserted in
+                    # the same rerun), preserve the local pending node instead of
+                    # clobbering it.
+                    pending = st.session_state.pop("_pt_just_added", None)
+                    if pending:
+                        local_ids = {str(n.get("id")) for n in st.session_state.get("product_tree", [])}
+                        already_in_db = any(
+                            str(n.get("code")) == pending.get("code")
+                            for n in db_tree
+                        )
+                        if not already_in_db:
+                            # keep the just-added local node on top of DB tree
+                            new_node = {
+                                "id": pending.get("local_id", ""),
+                                "uuid": "",
+                                "parent_id": None,
+                                "level": pending.get("level", "subsystem"),
+                                "code": pending.get("code", ""),
+                                "name": pending.get("name", ""),
+                                "subsystem_type": None,
+                                "is_leaf": False,
+                                "quantity": 1,
+                                "trl": 1,
+                                "status": "proposed",
+                            }
+                            db_tree.append(new_node)
                     st.session_state["product_tree"] = db_tree
                 
         except Exception as e:
