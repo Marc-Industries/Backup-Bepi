@@ -1836,51 +1836,39 @@ def page_product_tree():
     flat = _get_product_tree()
     eb = _get_equip_budgets()
 
-    # --- pt_bridge: a tiny invisible component that listens for the
-    # `pt_action` postMessage sent by the main product-tree iframe, and
-    # forwards it back to Python via `Streamlit.setComponentValue`. This
-    # works because THIS component is wrapped by Streamlit (the main tree
-    # component is rendered with `srcdoc` and cannot trigger a rerun by
-    # itself). `st_autorefresh` (set up below) guarantees a rerun even when
-    # the user is idle, so the Python handler at the top of the file can
-    # pick up the action without needing URL navigation.
-    bridge_value = components.html(
-        """<!DOCTYPE html><html><body><script>
-        window.addEventListener('message', function(ev) {
-            try {
-                var d = ev.data;
-                if (!d || d.type !== 'pt_action') return;
-                if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
-                    window.parent.Streamlit.setComponentValue(d);
-                }
-            } catch (e) { console.error('[pt-bridge]', e); }
-        });
-        </script></body></html>""",
-        height=0,
-        key="pt_bridge",
-    )
-    if bridge_value and isinstance(bridge_value, dict) and bridge_value.get("type") == "pt_action":
-        action = bridge_value.get("action")
-        data = bridge_value.get("data") or {}
-        # Forward to the existing pt_action handler, but only once per
-        # payload (guarded by a session_state marker that we clear after
-        # processing, so a rerun from autorefresh does not re-process).
-        marker = bridge_value.get("ts")
-        if action and marker is not None:
-            last = st.session_state.get("_pt_bridge_last")
-            if last != marker:
-                st.session_state["_pt_bridge_last"] = marker
-                _process_product_tree_action(action, data, flat, eb)
-                st.rerun()
-
-    # --- st_autorefresh: poll every 2s so the bridge → Python path lands
-    # even when the user is idle. Imported lazily so the dep is optional;
-    # if the package is missing on a deployment, we fall back to a no-op.
+    # --- pt_bridge: tiny component that listens for `pt_action` postMessages
+    # from the main product-tree iframe (rendered with srcdoc, no usable URL
+    # for navigation) and forwards them by navigating the top window to a
+    # URL with the action encoded as query params. The top window is a real
+    # Streamlit URL, so the navigation succeeds; Python reads pt_action
+    # from query_params at the top of the file and processes it.
+    #
+    # The new `components.v1.html` signature (Streamlit >=1.40) no longer
+    # accepts `key=` and no longer returns a value, so we cannot use the
+    # bidirectional setComponentValue pattern. URL navigation is the only
+    # mechanism that works on the deployed app.
+    #
+    # Wrapped in try/except to avoid taking the whole page down if the
+    # component itself errors out (e.g. on a build that does not allow
+    # postMessage listeners).
     try:
-        from streamlit_autorefresh import st_autorefresh
-        st_autorefresh(interval=2000, limit=None, key="pt_autorefresh")
-    except Exception:
-        pass
+        components.html(
+            "<script>"
+            "window.addEventListener('message',function(ev){"
+            "try{var d=ev.data;"
+            "if(!d||d.type!=='pt_action')return;"
+            "var u=new URL(window.top.location.href);"
+            "u.searchParams.set('pt_action',d.action);"
+            "u.searchParams.set('pt_data',JSON.stringify(d.data||{}));"
+            "u.searchParams.set('_',String(d.ts||Date.now()));"
+            "window.top.location.assign(u.toString());"
+            "}catch(e){console.error('[pt-bridge]',e);}});"
+            "</script>",
+            height=1,
+        )
+    except Exception as _bridge_ex:
+        import logging as _bridge_log
+        _bridge_log.warning("pt_bridge failed: %s", _bridge_ex)
 
     # --- Hide Streamlit chrome completely ---
     st.markdown("""

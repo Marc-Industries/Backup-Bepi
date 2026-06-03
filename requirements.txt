@@ -1,6 +1,5 @@
 streamlit>=1.40.0
 streamlit-cookies-controller>=0.0.4
-streamlit-autorefresh>=1.0.0
 supabase>=2.0.0
 httpx>=0.25.0
 plotly
