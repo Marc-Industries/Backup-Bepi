@@ -1073,17 +1073,20 @@ def _get_equip_budgets():
 if "pt_action" in st.query_params:
     import json
     import urllib.parse
+    import logging as _pt_log
     action = st.query_params.get("pt_action")
     try:
         data_str = st.query_params.get("pt_data", "{}")
         data = json.loads(urllib.parse.unquote(data_str))
-    except:
+    except Exception as _pt_ex:
         data = {}
+        _pt_log.warning("pt_action: failed to parse pt_data: %s", _pt_ex)
 
     # Clear query params FIRST so the rerun below does not re-enter this block
     # and so Streamlit does not reopen the sidebar/login as if it were a fresh
     # session. Also avoids the "duplicate sidebar" loop on every Add Node.
     st.query_params.clear()
+    _pt_log.info("pt_action=%s data=%s", action, data)
 
     flat = _get_product_tree()
     eb = _get_equip_budgets()
@@ -2533,6 +2536,7 @@ def page_product_tree():
 let items = __INJECT_ITEMS_HERE__;
 
 function triggerStreamlit(action, data) {
+    console.log("[pt] triggerStreamlit", action, data);
     // Persist the action so Python can pick it up on the next rerun, without
     // navigating the URL (which on Streamlit Cloud triggers a flash of the
     // login screen and opens a duplicate sidebar on every Add Node).
@@ -2540,16 +2544,20 @@ function triggerStreamlit(action, data) {
         sessionStorage.setItem('pt_action', action);
         sessionStorage.setItem('pt_data', JSON.stringify(data));
         localStorage.setItem('pt_pending_action', JSON.stringify({ action, data, ts: Date.now() }));
-    } catch (e) {}
+    } catch (e) {
+        console.warn("[pt] storage write failed", e);
+    }
 
     // Preferred path (local dev / un-sandboxed iframes): notify Streamlit
     // directly. This causes a clean rerun that preserves session_state, the
     // current page, and the sidebar state.
     if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
+        console.log("[pt] setComponentValue available, using it");
         window.parent.Streamlit.setComponentValue({ timestamp: Date.now() });
         return;
     }
 
+    console.log("[pt] setComponentValue NOT available, falling back to URL navigation");
     // Sandboxed path (Streamlit Cloud): do a no-op HTTP GET to the same page
     // with a sentinel query param. We use `window.location.replace` (the
     // iframe itself) rather than `window.parent.location.*`, because the
@@ -2561,9 +2569,11 @@ function triggerStreamlit(action, data) {
     url.searchParams.set('pt_action', action);
     url.searchParams.set('pt_data', JSON.stringify(data));
     url.searchParams.set('_', Date.now().toString());
+    console.log("[pt] navigating to", url.toString());
     try {
         window.location.replace(url.toString());
     } catch (e) {
+        console.error("[pt] replace failed, falling back to reload", e);
         // Last-resort fallback: hard reload the iframe (NOT the parent).
         window.location.reload();
     }
