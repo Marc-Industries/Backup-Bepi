@@ -1,11 +1,42 @@
 from bepi.supabase_client import get_supabase, get_service_client
 
+try:
+    from pandas import isna as pd_isna
+except Exception:  # pragma: no cover
+    def pd_isna(x):  # type: ignore
+        return x is None
+
+
+def _jsonable(value):
+    """Convert numpy / pandas scalars to native Python types so json.dumps works."""
+    if value is None:
+        return None
+    # pandas / numpy NaN/NA → None
+    try:
+        if pd_isna(value):
+            return None
+    except Exception:
+        pass
+    # numpy scalar
+    if hasattr(value, "item"):
+        try:
+            return value.item()
+        except Exception:
+            pass
+    return value
+
+
+def _clean_updates(updates: dict) -> dict:
+    """Coerce values to JSON-safe Python types (numpy/pandas scalars, NaN/NA → None)."""
+    return {k: _jsonable(v) for k, v in updates.items()}
+
 
 def update_mission_member(mission_id: str, user_id: str, updates: dict) -> None:
     client = get_service_client() or get_supabase()
     if not client or not mission_id or not user_id:
         return
-    client.table("mission_members").update(updates).eq("mission_id", mission_id).eq("user_id", user_id).execute()
+    payload = _clean_updates(updates)
+    client.table("mission_members").update(payload).eq("mission_id", mission_id).eq("user_id", user_id).execute()
 
 
 def add_mission_member(mission_id: str, user_id: str, role: str = "PM", subsystem: str | None = None) -> dict | None:

@@ -5055,22 +5055,31 @@ def page_team():
             if not edited_team.equals(df_team):
                 from bepi.db_writer import update_mission_member
                 _mid = st.session_state.get("active_mission_id")
-                for i, row in edited_team.iterrows():
+                for i in range(len(edited_team)):
+                    row = edited_team.iloc[i]
                     m = get_team()[i]
-                    m["name"] = row["Name"]
-                    sel_role_name = row["Role"]
-                    m["role"] = next((k for k, v in ROLES.items() if v["name"] == sel_role_name), m["role"])
-                    m["org"] = row["Org"]
-                    sub = row["Subsystem"]
-                    if sub and sub != "—":
-                        m["subsystem"] = sub
-                    elif "subsystem" in m:
-                        del m["subsystem"]
+                    # Coerce pandas/numpy values to native Python types
+                    new_name = str(row["Name"]) if row["Name"] is not None else m["name"]
+                    new_role_name = str(row["Role"]) if row["Role"] is not None else m["role"]
+                    new_org = str(row["Org"]) if row["Org"] is not None else m.get("org", "Prime")
+                    new_sub = row["Subsystem"]
+                    if new_sub is None or (isinstance(new_sub, float) and str(new_sub) == "nan"):
+                        new_sub = "—"
+
+                    m["name"] = new_name
+                    m["role"] = next((k for k, v in ROLES.items() if v["name"] == new_role_name), m["role"])
+                    m["org"] = new_org
+                    if new_sub and new_sub != "—":
+                        m["subsystem"] = str(new_sub)
+                    else:
+                        m.pop("subsystem", None)
                     if _mid and HAS_SUPABASE:
-                        update_mission_member(_mid, m["id"], {
-                            "role": m["role"],
-                            "subsystem": m.get("subsystem"),
-                        })
+                        payload = {"role": str(m["role"])}
+                        if "subsystem" in m:
+                            payload["subsystem"] = str(m["subsystem"])
+                        else:
+                            payload["subsystem"] = None  # explicit clear
+                        update_mission_member(_mid, str(m["id"]), payload)
                 st.rerun()
         else:
             st.dataframe(df_team, width="stretch", hide_index=True, height=min(len(roster_rows) * 38 + 40, 400))
