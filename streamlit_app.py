@@ -1079,7 +1079,12 @@ if "pt_action" in st.query_params:
         data = json.loads(urllib.parse.unquote(data_str))
     except:
         data = {}
-    
+
+    # Clear query params FIRST so the rerun below does not re-enter this block
+    # and so Streamlit does not reopen the sidebar/login as if it were a fresh
+    # session. Also avoids the "duplicate sidebar" loop on every Add Node.
+    st.query_params.clear()
+
     flat = _get_product_tree()
     eb = _get_equip_budgets()
     _process_product_tree_action(action, data, flat, eb)
@@ -2528,46 +2533,40 @@ def page_product_tree():
 let items = __INJECT_ITEMS_HERE__;
 
 function triggerStreamlit(action, data) {
-    // Store action in sessionStorage and trigger a simple rerun
-    // This avoids full page navigation when possible.
+    // Persist the action so Python can pick it up on the next rerun, without
+    // navigating the URL (which on Streamlit Cloud triggers a flash of the
+    // login screen and opens a duplicate sidebar on every Add Node).
     try {
         sessionStorage.setItem('pt_action', action);
         sessionStorage.setItem('pt_data', JSON.stringify(data));
-    } catch(e) {}
-    
-    const url = new URL(window.parent.location.href);
-    url.searchParams.set('pt_action', action);
-    url.searchParams.set('pt_data', JSON.stringify(data));
-    url.searchParams.set('_', Date.now().toString());
-
-    // Best-effort URL sync (may be blocked by the Streamlit iframe sandbox).
-    try {
-        window.parent.history.replaceState({}, '', url.toString());
-    } catch (e) {
-        try { window.history.replaceState({}, '', url.toString()); } catch (_) {}
-    }
-
-    // Push the action to localStorage so a later rerun (or hard reload) can
-    // pick it up even when setComponentValue / parent navigation are blocked.
-    try {
         localStorage.setItem('pt_pending_action', JSON.stringify({ action, data, ts: Date.now() }));
     } catch (e) {}
 
-    setTimeout(() => {
-        if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
-            window.parent.Streamlit.setComponentValue({timestamp: Date.now()});
-        } else {
-            // Fallback: do a hard reload of the iframe itself (NOT the parent).
-            // This re-runs Streamlit, which re-evaluates pt_action handling on
-            // a one-shot "action" + "data" via localStorage (see Python side).
-            try {
-                window.location.href = url.toString();
-            } catch (e) {
-                // Last resort: force a reload of the current frame.
-                window.location.reload();
-            }
-        }
-    }, 100);
+    // Preferred path (local dev / un-sandboxed iframes): notify Streamlit
+    // directly. This causes a clean rerun that preserves session_state, the
+    // current page, and the sidebar state.
+    if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
+        window.parent.Streamlit.setComponentValue({ timestamp: Date.now() });
+        return;
+    }
+
+    // Sandboxed path (Streamlit Cloud): do a no-op HTTP GET to the same page
+    // with a sentinel query param. We use `window.location.replace` (the
+    // iframe itself) rather than `window.parent.location.*`, because the
+    // latter is blocked by the Streamlit iframe sandbox with a SecurityError.
+    // Python reads `pt_action`/`pt_data`, processes the action, clears the
+    // params, and reruns — so the next request comes in clean and Streamlit
+    // does not reopen the login screen or duplicate the sidebar.
+    const url = new URL(window.location.href);
+    url.searchParams.set('pt_action', action);
+    url.searchParams.set('pt_data', JSON.stringify(data));
+    url.searchParams.set('_', Date.now().toString());
+    try {
+        window.location.replace(url.toString());
+    } catch (e) {
+        // Last-resort fallback: hard reload the iframe (NOT the parent).
+        window.location.reload();
+    }
 }
 
 
