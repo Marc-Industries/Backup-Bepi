@@ -1069,7 +1069,10 @@ def _get_equip_budgets():
     return st.session_state["equip_budgets"]
 
 
-# --- Process product tree actions from URL params ---
+# --- Process product tree actions from the URL (legacy path, kept for
+# backward compatibility with older clients that still navigate). The
+# primary path now is the pt_bridge component (postMessage) handled inside
+# page_product_tree(). ---
 if "pt_action" in st.query_params:
     import json
     import urllib.parse
@@ -1082,11 +1085,8 @@ if "pt_action" in st.query_params:
         data = {}
         _pt_log.warning("pt_action: failed to parse pt_data: %s", _pt_ex)
 
-    # Clear query params FIRST so the rerun below does not re-enter this block
-    # and so Streamlit does not reopen the sidebar/login as if it were a fresh
-    # session. Also avoids the "duplicate sidebar" loop on every Add Node.
     st.query_params.clear()
-    _pt_log.info("pt_action=%s data=%s", action, data)
+    _pt_log.info("pt_action=%s data=%s (legacy URL path)", action, data)
 
     flat = _get_product_tree()
     eb = _get_equip_budgets()
@@ -1832,10 +1832,55 @@ def page_product_tree():
     import json
     import urllib.parse
     import streamlit.components.v1 as components
-    
+
     flat = _get_product_tree()
     eb = _get_equip_budgets()
-    
+
+    # --- pt_bridge: a tiny invisible component that listens for the
+    # `pt_action` postMessage sent by the main product-tree iframe, and
+    # forwards it back to Python via `Streamlit.setComponentValue`. This
+    # works because THIS component is wrapped by Streamlit (the main tree
+    # component is rendered with `srcdoc` and cannot trigger a rerun by
+    # itself). `st_autorefresh` (set up below) guarantees a rerun even when
+    # the user is idle, so the Python handler at the top of the file can
+    # pick up the action without needing URL navigation.
+    bridge_value = components.html(
+        """<!DOCTYPE html><html><body><script>
+        window.addEventListener('message', function(ev) {
+            try {
+                var d = ev.data;
+                if (!d || d.type !== 'pt_action') return;
+                if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
+                    window.parent.Streamlit.setComponentValue(d);
+                }
+            } catch (e) { console.error('[pt-bridge]', e); }
+        });
+        </script></body></html>""",
+        height=0,
+        key="pt_bridge",
+    )
+    if bridge_value and isinstance(bridge_value, dict) and bridge_value.get("type") == "pt_action":
+        action = bridge_value.get("action")
+        data = bridge_value.get("data") or {}
+        # Forward to the existing pt_action handler, but only once per
+        # payload (guarded by a session_state marker that we clear after
+        # processing, so a rerun from autorefresh does not re-process).
+        marker = bridge_value.get("ts")
+        if action and marker is not None:
+            last = st.session_state.get("_pt_bridge_last")
+            if last != marker:
+                st.session_state["_pt_bridge_last"] = marker
+                _process_product_tree_action(action, data, flat, eb)
+                st.rerun()
+
+    # --- st_autorefresh: poll every 2s so the bridge → Python path lands
+    # even when the user is idle. Imported lazily so the dep is optional;
+    # if the package is missing on a deployment, we fall back to a no-op.
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        st_autorefresh(interval=2000, limit=None, key="pt_autorefresh")
+    except Exception:
+        pass
 
     # --- Hide Streamlit chrome completely ---
     st.markdown("""
@@ -2537,9 +2582,17 @@ let items = __INJECT_ITEMS_HERE__;
 
 function triggerStreamlit(action, data) {
     console.log("[pt] triggerStreamlit", action, data);
-    // Persist the action so Python can pick it up on the next rerun, without
-    // navigating the URL (which on Streamlit Cloud triggers a flash of the
-    // login screen and opens a duplicate sidebar on every Add Node).
+    // We do NOT navigate the URL: the Streamlit `components.html` iframe is
+    // rendered with `srcdoc`, so `window.location.href` resolves to
+    // `about:srcdoc` and any `window.location.replace(...)` is a silent no-op.
+    // We also do NOT call `setComponentValue` here: this iframe is not
+    // directly wrapped by Streamlit, so the call is a no-op too.
+    //
+    // Instead, we postMessage the action to the parent window. A sibling
+    // `components.html` (the "pt_bridge") is listening and calls
+    // `Streamlit.setComponentValue` from inside its own iframe, which IS
+    // wrapped by Streamlit and does trigger a rerun. `st_autorefresh`
+    // guarantees that rerun fires even if the user is idle.
     try {
         sessionStorage.setItem('pt_action', action);
         sessionStorage.setItem('pt_data', JSON.stringify(data));
@@ -2547,35 +2600,13 @@ function triggerStreamlit(action, data) {
     } catch (e) {
         console.warn("[pt] storage write failed", e);
     }
-
-    // Preferred path (local dev / un-sandboxed iframes): notify Streamlit
-    // directly. This causes a clean rerun that preserves session_state, the
-    // current page, and the sidebar state.
-    if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
-        console.log("[pt] setComponentValue available, using it");
-        window.parent.Streamlit.setComponentValue({ timestamp: Date.now() });
-        return;
-    }
-
-    console.log("[pt] setComponentValue NOT available, falling back to URL navigation");
-    // Sandboxed path (Streamlit Cloud): do a no-op HTTP GET to the same page
-    // with a sentinel query param. We use `window.location.replace` (the
-    // iframe itself) rather than `window.parent.location.*`, because the
-    // latter is blocked by the Streamlit iframe sandbox with a SecurityError.
-    // Python reads `pt_action`/`pt_data`, processes the action, clears the
-    // params, and reruns — so the next request comes in clean and Streamlit
-    // does not reopen the login screen or duplicate the sidebar.
-    const url = new URL(window.location.href);
-    url.searchParams.set('pt_action', action);
-    url.searchParams.set('pt_data', JSON.stringify(data));
-    url.searchParams.set('_', Date.now().toString());
-    console.log("[pt] navigating to", url.toString());
     try {
-        window.location.replace(url.toString());
+        window.parent.postMessage(
+            { type: 'pt_action', action, data, ts: Date.now() },
+            '*'
+        );
     } catch (e) {
-        console.error("[pt] replace failed, falling back to reload", e);
-        // Last-resort fallback: hard reload the iframe (NOT the parent).
-        window.location.reload();
+        console.error("[pt] postMessage failed", e);
     }
 }
 
