@@ -1828,6 +1828,121 @@ def page_overview():
     sac.steps(step_items, index=current_idx, return_index=False)
 
 
+def _render_pt_add_form(flat: list, eb: dict) -> None:
+    """Render the native Streamlit 'Add Node' form for the Product Tree.
+
+    Replaces the JS-driven modal that lived inside the components.html
+    template. The JS modal could not communicate reliably with Python on
+    Streamlit Cloud (srcdoc iframe, no setComponentValue, sandboxed
+    navigation). The native form below writes directly to Supabase on
+    submit, then triggers st.rerun() to redraw the tree.
+
+    Visible only to roles that can edit the product tree (PM, SE, ADMIN,
+    SSL), mirroring the gate in _process_product_tree_action.
+    """
+    from bepi.role_permissions import can
+
+    user = st.session_state.get("user", {})
+    role = user.get("role", "USER")
+    if not (role == "ADMIN" or can("edit_subsystem") or can("edit_budget")):
+        # Read-only viewers see no form, but we still draw a small note so
+        # they understand why the controls are missing.
+        st.caption("🔒 You need PM/SE/ADMIN/SSL role to add nodes.")
+        return
+
+    mission_id = st.session_state.get("active_mission_id")
+    if not mission_id:
+        st.warning("No active mission selected.")
+        return
+
+    with st.expander("➕ Add Node", expanded=False):
+        # Use a form so submission is atomic and only fires on the explicit
+        # "Add" button click (not on every widget change).
+        with st.form(key="pt_add_node_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                new_name = st.text_input("Name *", placeholder="e.g. ADCS Sensor")
+                new_code = st.text_input("Code *", placeholder="e.g. ADCS-001")
+            with c2:
+                level_options = ["spacecraft", "subsystem", "equipment", "component"]
+                new_level = st.selectbox("Level", level_options, index=2)
+                # Parent dropdown: list existing nodes by name+code so the user
+                # can pick one. Empty = root.
+                parent_labels = ["(root)"] + [
+                    f"{n.get('code', '')} — {n.get('name', '')}" for n in flat
+                ]
+                parent_keys = [None] + [str(n.get("id")) for n in flat]
+                parent_idx = st.selectbox(
+                    "Parent",
+                    range(len(parent_labels)),
+                    format_func=lambda i: parent_labels[i],
+                    index=0,
+                )
+                new_parent_id = parent_keys[parent_idx] if parent_idx else None
+
+            c3, c4, c5 = st.columns(3)
+            with c3:
+                new_trl = st.number_input("TRL", min_value=1, max_value=9, value=5, step=1)
+            with c4:
+                new_qty = st.number_input("Quantity", min_value=1, value=1, step=1)
+            with c5:
+                new_mass = st.number_input(
+                    "Mass (kg)",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.1,
+                    help="Equipment-level only; stored in budgets table for now.",
+                )
+
+            submitted = st.form_submit_button("Add Node", type="primary")
+
+        if submitted:
+            if not new_name.strip() or not new_code.strip():
+                st.error("Name and Code are required.")
+                st.stop()
+
+            client = get_service_client() or get_supabase()
+            if not client:
+                st.error("Database not configured. Cannot save.")
+                st.stop()
+
+            # The DB column is `level`; the tree template uses `level` for
+            # "satellite" instead of "spacecraft" (legacy naming). Mirror the
+            # mapping that the legacy JS insert used so the values line up
+            # with what the tree expects.
+            db_level = "satellite" if new_level == "spacecraft" else new_level
+
+            # Resolve parent_id: it can be a UUID (from Supabase) or a tree
+            # code (from local session state). The legacy handler walked the
+            # session_state tree to find the UUID for a given code; we do the
+            # same so the form works against either source of truth.
+            def _parent_uuid(parent_id):
+                if not parent_id:
+                    return None
+                for n in st.session_state.get("product_tree", []):
+                    if str(n.get("id")) == str(parent_id) or str(n.get("uuid")) == str(parent_id):
+                        return str(n.get("uuid") or n.get("id"))
+                return str(parent_id)
+
+            payload = {
+                "mission_id": mission_id,
+                "parent_id": _parent_uuid(new_parent_id),
+                "level": db_level,
+                "code": new_code.strip(),
+                "name": new_name.strip(),
+                "quantity": int(new_qty),
+                "trl": int(new_trl),
+            }
+
+            try:
+                result = client.table("product_tree_nodes").insert(payload).execute()
+                st.success(f"✅ Added **{new_name}** to the product tree.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save: {e}")
+                # Don't rerun — keep the form filled so the user can retry.
+
+
 def page_product_tree():
     import json
     import urllib.parse
@@ -2857,7 +2972,14 @@ setView('tree');
 </body>
 </html>
 """
-    
+
+    # --- Add Node form (Streamlit native, replaces the JS modal) ---
+    # The form is rendered as a compact collapsible above the tree so the
+    # tree visual stays untouched. The submit handler writes directly to
+    # Supabase via the same client used by _process_product_tree_action,
+    # then triggers st.rerun() to redraw the tree from the new DB state.
+    _render_pt_add_form(flat, eb)
+
     html_content = HTML_TEMPLATE.replace("__INJECT_ITEMS_HERE__", items_json)
     components.html(html_content, height=1000, scrolling=True)
 
