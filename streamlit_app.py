@@ -2540,18 +2540,32 @@ function triggerStreamlit(action, data) {
     url.searchParams.set('pt_data', JSON.stringify(data));
     url.searchParams.set('_', Date.now().toString());
 
-    // Replace the URL on the parent page
+    // Best-effort URL sync (may be blocked by the Streamlit iframe sandbox).
     try {
         window.parent.history.replaceState({}, '', url.toString());
     } catch (e) {
-        window.history.replaceState({}, '', url.toString());
+        try { window.history.replaceState({}, '', url.toString()); } catch (_) {}
     }
+
+    // Push the action to localStorage so a later rerun (or hard reload) can
+    // pick it up even when setComponentValue / parent navigation are blocked.
+    try {
+        localStorage.setItem('pt_pending_action', JSON.stringify({ action, data, ts: Date.now() }));
+    } catch (e) {}
 
     setTimeout(() => {
         if (window.parent.Streamlit && typeof window.parent.Streamlit.setComponentValue === 'function') {
             window.parent.Streamlit.setComponentValue({timestamp: Date.now()});
         } else {
-            window.parent.location.href = url.toString();
+            // Fallback: do a hard reload of the iframe itself (NOT the parent).
+            // This re-runs Streamlit, which re-evaluates pt_action handling on
+            // a one-shot "action" + "data" via localStorage (see Python side).
+            try {
+                window.location.href = url.toString();
+            } catch (e) {
+                // Last resort: force a reload of the current frame.
+                window.location.reload();
+            }
         }
     }, 100);
 }
