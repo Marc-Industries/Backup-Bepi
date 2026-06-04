@@ -2638,10 +2638,8 @@ def page_product_tree():
           </button>
         </div>
       </div>
-      <button class="add-btn" onclick="openModal(null)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Component
-      </button>
+      <!-- The "Add Node" trigger is rendered natively by Streamlit
+           (see _render_pt_add_form), so the old HTML button is gone. -->
     </header>
 
     <div class="content">
@@ -2652,54 +2650,6 @@ def page_product_tree():
       </div>
     </div>
   </main>
-</div>
-
-<!-- MODAL -->
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <div class="modal-head">
-      <div>
-        <h3 id="modal-title">Add Component</h3>
-        <p>Definisci le specifiche del nuovo elemento</p>
-      </div>
-      <button class="modal-close" onclick="closeModal()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">Parent Node</label>
-          <select class="form-select" id="modal-parent">
-            <option value="">Root — (No Parent)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Level</label>
-          <select class="form-select" id="modal-level">
-            <option value="mission">Mission</option>
-            <option value="satellite">Satellite</option>
-            <option value="subsystem" selected>Subsystem</option>
-            <option value="equipment">Equipment</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label class="form-label">WBS Code</label>
-          <input class="form-input" id="modal-code" type="text" placeholder="e.g. STR-001"/>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Component Name</label>
-          <input class="form-input" id="modal-name" type="text" placeholder="Nome descrittivo..."/>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="cancel-btn" onclick="closeModal()">Cancel</button>
-      <button class="create-btn" onclick="createNode()">Create Node</button>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -2795,7 +2745,8 @@ function renderTreeNodes(parentId, depth, isChild) {
           </div>
           <span class="node-name">${node.name}</span>
         </div>
-        <button class="node-add-btn" onclick="event.stopPropagation(); openModal('${node.id}')">${icons.plus}</button>
+        <!-- The per-node "+" button used to open the old modal; the Streamlit
+             Add Node dialog is now the only entry point. -->
       </div>
       ${(hasChildren && open) ? renderTreeNodes(node.id, depth + 1, true) : ''}
     </div>`;
