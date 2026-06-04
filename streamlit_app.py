@@ -1829,12 +1829,12 @@ def page_overview():
 
 
 def _render_pt_add_form(flat: list, eb: dict) -> None:
-    """Render the native Streamlit 'Add Node' form for the Product Tree.
+    """Render the 'Add Node' trigger and dialog for the Product Tree.
 
     Replaces the JS-driven modal that lived inside the components.html
     template. The JS modal could not communicate reliably with Python on
     Streamlit Cloud (srcdoc iframe, no setComponentValue, sandboxed
-    navigation). The native form below writes directly to Supabase on
+    navigation). The native dialog below writes directly to Supabase on
     submit, then triggers st.rerun() to redraw the tree.
 
     Visible only to roles that can edit the product tree (PM, SE, ADMIN,
@@ -1845,8 +1845,6 @@ def _render_pt_add_form(flat: list, eb: dict) -> None:
     user = st.session_state.get("user", {})
     role = user.get("role", "USER")
     if not (role == "ADMIN" or can("edit_subsystem") or can("edit_budget")):
-        # Read-only viewers see no form, but we still draw a small note so
-        # they understand why the controls are missing.
         st.caption("🔒 You need PM/SE/ADMIN/SSL role to add nodes.")
         return
 
@@ -1855,48 +1853,112 @@ def _render_pt_add_form(flat: list, eb: dict) -> None:
         st.warning("No active mission selected.")
         return
 
-    with st.expander("➕ Add Node", expanded=False):
-        # Use a form so submission is atomic and only fires on the explicit
-        # "Add" button click (not on every widget change).
-        with st.form(key="pt_add_node_form", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                new_name = st.text_input("Name *", placeholder="e.g. ADCS Sensor")
-                new_code = st.text_input("Code *", placeholder="e.g. ADCS-001")
-            with c2:
-                level_options = ["spacecraft", "subsystem", "equipment", "component"]
-                new_level = st.selectbox("Level", level_options, index=2)
-                # Parent dropdown: list existing nodes by name+code so the user
-                # can pick one. Empty = root.
-                parent_labels = ["(root)"] + [
-                    f"{n.get('code', '')} — {n.get('name', '')}" for n in flat
-                ]
-                parent_keys = [None] + [str(n.get("id")) for n in flat]
-                parent_idx = st.selectbox(
-                    "Parent",
-                    range(len(parent_labels)),
-                    format_func=lambda i: parent_labels[i],
-                    index=0,
-                )
-                new_parent_id = parent_keys[parent_idx] if parent_idx else None
+    # The dialog reads the parent list from session_state because
+    # @st.dialog-decorated functions cannot take arguments.
+    st.session_state["_pt_add_parent_labels"] = ["(root)"] + [
+        f"{n.get('code', '')} — {n.get('name', '')}" for n in flat
+    ]
+    st.session_state["_pt_add_parent_keys"] = [None] + [
+        str(n.get("id")) for n in flat
+    ]
 
-            c3, c4, c5 = st.columns(3)
-            with c3:
-                new_trl = st.number_input("TRL", min_value=1, max_value=9, value=5, step=1)
-            with c4:
-                new_qty = st.number_input("Quantity", min_value=1, value=1, step=1)
-            with c5:
-                new_mass = st.number_input(
-                    "Mass (kg)",
-                    min_value=0.0,
-                    value=0.0,
-                    step=0.1,
-                    help="Equipment-level only; stored in budgets table for now.",
-                )
+    # Trigger button styled like the old "Add Component" header button.
+    if st.button(
+        "➕ Add Node",
+        key="pt_open_add_dialog",
+        type="primary",
+        use_container_width=False,
+    ):
+        st.session_state["_pt_dialog_open"] = True
+        st.rerun()
 
-            submitted = st.form_submit_button("Add Node", type="primary")
+    if st.session_state.get("_pt_dialog_open"):
+        _pt_add_node_dialog()
 
-        if submitted:
+
+@st.dialog("Add Node", width="medium")
+def _pt_add_node_dialog() -> None:
+    """Streamlit-native modal for creating a product tree node.
+
+    Mirrors the layout of the previous JS modal: Name + Code on the first
+    row, Level + Parent on the second, TRL/Quantity/Mass on the third, with
+    a Cancel/Add action row at the bottom. Submits directly to Supabase
+    via the same client used by _process_product_tree_action.
+    """
+    parent_labels = st.session_state.get("_pt_add_parent_labels", ["(root)"])
+    parent_keys = st.session_state.get("_pt_add_parent_keys", [None])
+    mission_id = st.session_state.get("active_mission_id")
+
+    # --- Header / intro ---
+    st.caption("Define the specs of the new product tree element.")
+
+    # --- Row 1: Name + Code ---
+    c1, c2 = st.columns(2)
+    with c1:
+        new_name = st.text_input(
+            "NAME",
+            placeholder="e.g. ADCS Sensor",
+            key="_pt_new_name",
+        )
+    with c2:
+        new_code = st.text_input(
+            "CODE",
+            placeholder="e.g. ADCS-001",
+            key="_pt_new_code",
+        )
+
+    # --- Row 2: Level + Parent ---
+    c3, c4 = st.columns(2)
+    with c3:
+        level_options = ["spacecraft", "subsystem", "equipment", "component"]
+        new_level = st.selectbox(
+            "LEVEL",
+            level_options,
+            index=2,
+            key="_pt_new_level",
+        )
+    with c4:
+        parent_idx = st.selectbox(
+            "PARENT",
+            range(len(parent_labels)),
+            format_func=lambda i: parent_labels[i],
+            index=0,
+            key="_pt_new_parent",
+        )
+        new_parent_id = parent_keys[parent_idx] if parent_idx else None
+
+    # --- Row 3: TRL / Qty / Mass ---
+    c5, c6, c7 = st.columns(3)
+    with c5:
+        new_trl = st.number_input(
+            "TRL", min_value=1, max_value=9, value=5, step=1, key="_pt_new_trl"
+        )
+    with c6:
+        new_qty = st.number_input(
+            "QTY", min_value=1, value=1, step=1, key="_pt_new_qty"
+        )
+    with c7:
+        new_mass = st.number_input(
+            "MASS (kg)",
+            min_value=0.0,
+            value=0.0,
+            step=0.1,
+            key="_pt_new_mass",
+            help="Equipment-level only; stored in budgets table.",
+        )
+
+    st.divider()
+
+    # --- Action row ---
+    acol1, acol2 = st.columns([1, 1])
+    with acol1:
+        if st.button("Cancel", key="_pt_cancel", use_container_width=True):
+            st.session_state["_pt_dialog_open"] = False
+            st.rerun()
+    with acol2:
+        if st.button(
+            "Add Node", key="_pt_submit", type="primary", use_container_width=True
+        ):
             if not new_name.strip() or not new_code.strip():
                 st.error("Name and Code are required.")
                 st.stop()
@@ -1906,16 +1968,10 @@ def _render_pt_add_form(flat: list, eb: dict) -> None:
                 st.error("Database not configured. Cannot save.")
                 st.stop()
 
-            # The DB column is `level`; the tree template uses `level` for
-            # "satellite" instead of "spacecraft" (legacy naming). Mirror the
-            # mapping that the legacy JS insert used so the values line up
-            # with what the tree expects.
+            # Map "spacecraft" → "satellite" to match the legacy column
+            # vocabulary used by the rest of the tree.
             db_level = "satellite" if new_level == "spacecraft" else new_level
 
-            # Resolve parent_id: it can be a UUID (from Supabase) or a tree
-            # code (from local session state). The legacy handler walked the
-            # session_state tree to find the UUID for a given code; we do the
-            # same so the form works against either source of truth.
             def _parent_uuid(parent_id):
                 if not parent_id:
                     return None
@@ -1935,12 +1991,13 @@ def _render_pt_add_form(flat: list, eb: dict) -> None:
             }
 
             try:
-                result = client.table("product_tree_nodes").insert(payload).execute()
+                client.table("product_tree_nodes").insert(payload).execute()
+                st.session_state["_pt_dialog_open"] = False
                 st.success(f"✅ Added **{new_name}** to the product tree.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Failed to save: {e}")
-                # Don't rerun — keep the form filled so the user can retry.
+                # Keep the dialog open so the user can retry.
 
 
 def page_product_tree():
@@ -1950,40 +2007,6 @@ def page_product_tree():
 
     flat = _get_product_tree()
     eb = _get_equip_budgets()
-
-    # --- pt_bridge: tiny component that listens for `pt_action` postMessages
-    # from the main product-tree iframe (rendered with srcdoc, no usable URL
-    # for navigation) and forwards them by navigating the top window to a
-    # URL with the action encoded as query params. The top window is a real
-    # Streamlit URL, so the navigation succeeds; Python reads pt_action
-    # from query_params at the top of the file and processes it.
-    #
-    # The new `components.v1.html` signature (Streamlit >=1.40) no longer
-    # accepts `key=` and no longer returns a value, so we cannot use the
-    # bidirectional setComponentValue pattern. URL navigation is the only
-    # mechanism that works on the deployed app.
-    #
-    # Wrapped in try/except to avoid taking the whole page down if the
-    # component itself errors out (e.g. on a build that does not allow
-    # postMessage listeners).
-    try:
-        components.html(
-            "<script>"
-            "window.addEventListener('message',function(ev){"
-            "try{var d=ev.data;"
-            "if(!d||d.type!=='pt_action')return;"
-            "var u=new URL(window.top.location.href);"
-            "u.searchParams.set('pt_action',d.action);"
-            "u.searchParams.set('pt_data',JSON.stringify(d.data||{}));"
-            "u.searchParams.set('_',String(d.ts||Date.now()));"
-            "window.top.location.assign(u.toString());"
-            "}catch(e){console.error('[pt-bridge]',e);}});"
-            "</script>",
-            height=1,
-        )
-    except Exception as _bridge_ex:
-        import logging as _bridge_log
-        _bridge_log.warning("pt_bridge failed: %s", _bridge_ex)
 
     # --- Hide Streamlit chrome completely ---
     st.markdown("""
