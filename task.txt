@@ -1,5 +1,5 @@
-  4 tasks (0 done, 1 in progress, 3 open)
-  ■ Build st.form Add Node for Product Tree
+  4 tasks
+  □ Build st.form Add Node for Product Tree
   □ Remove pt_bridge component
   □ Remove JS-only Add Node modal HTML/JS
   □ Verify syntax, commit, push to backup

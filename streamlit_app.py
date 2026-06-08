@@ -2858,10 +2858,7 @@ function setPage(el, name) {
   triggerStreamlit("nav_page", {page: name});
 }
 
-// ── MODAL ──
-
-let editModeId = null;
-
+// ── ACTIONS ──
 function toggleDropdown(e, id) {
   e.stopPropagation();
   document.querySelectorAll('.action-dropdown').forEach(d => {
@@ -2879,66 +2876,6 @@ function deleteNode(id) {
      triggerStreamlit("delete_node", {id: id});
   }
 }
-
-function openEditModal(id) {
-  const item = items.find(i => i.id === id);
-  if(!item) return;
-  editModeId = id;
-  
-  const sel = document.getElementById('modal-parent');
-  sel.innerHTML = '<option value="">Root — (No Parent)</option>' +
-    items.filter(i => i.id !== id).map(i => `<option value="${i.id}"${i.id===item.parentId?' selected':''}>${i.code} — ${i.name}</option>`).join('');
-    
-  document.getElementById('modal-code').value = item.code;
-  document.getElementById('modal-name').value = item.name;
-  document.getElementById('modal-level').value = item.level;
-  document.getElementById('modal-title').innerText = "Edit Component";
-  
-  document.getElementById('modal').classList.add('open');
-}
-
-function openModal(parentId) {
-  editModeId = null;
-  document.getElementById('modal-title').innerText = "Add Component";
-  const sel = document.getElementById('modal-parent');
-  sel.innerHTML = '<option value="">Root — (No Parent)</option>' +
-    items.map(i => `<option value="${i.id}"${i.id===parentId?' selected':''}>${i.code} — ${i.name}</option>`).join('');
-  document.getElementById('modal-code').value = '';
-  document.getElementById('modal-name').value = '';
-  document.getElementById('modal-level').value = 'subsystem';
-  document.getElementById('modal').classList.add('open');
-}
-
-function closeModal() {
-
-  document.getElementById('modal').classList.remove('open');
-}
-
-function createNode() {
-  const parentId = document.getElementById('modal-parent').value || null;
-  const code  = document.getElementById('modal-code').value.trim();
-  const name  = document.getElementById('modal-name').value.trim();
-  const level = document.getElementById('modal-level').value;
-  if (!code || !name) return;
-
-  if (editModeId) {
-     triggerStreamlit("edit_node", {id: editModeId, code, name, level, parentId});
-  } else {
-     const siblings = items.filter(i => i.parentId === parentId);
-     const newId = parentId
-        ? `${parentId}.${siblings.length + 1}`
-        : `${items.filter(i => !i.parentId).length + 1}`;
-
-     const newNode = { id: newId, code, name, level, parentId, mass: 0, power: 0, qty: 1, maturity: 'estimate', trl: 1 };
-     triggerStreamlit("add_node", newNode);
-  }
-  closeModal();
-}
-
-// click outside modal
-document.getElementById('modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
 
 // ── INIT ──
 setView('tree');

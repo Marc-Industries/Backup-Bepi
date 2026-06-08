@@ -59,3 +59,4 @@ out/
 # Generated
 *.mat
 *.log
+.collaborator
