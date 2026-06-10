@@ -549,7 +549,9 @@ def _get_product_tree(force_reload=False):
             and st.session_state.get("_pt_loaded_for") == mission_id):
         return st.session_state["product_tree"]
 
-    client = get_service_client() or get_supabase()
+    # User-scoped client so RLS enforces per-mission access (was the service
+    # client, which bypassed RLS entirely — audit S4).
+    client = get_supabase()
 
     if DB_ENFORCED and not client:
         st.error("🚫 Database connection required in this mode. Please configure Supabase credentials.")
@@ -622,7 +624,7 @@ def _get_equip_budgets():
     
     # Load budgets from DB if session is empty
     if not st.session_state["equip_budgets"]:
-        client = get_service_client() or get_supabase()
+        client = get_supabase()  # user-scoped: RLS enforces access (audit S4)
         mission_id = st.session_state.get("active_mission_id")
         
         if client and mission_id:
@@ -1556,7 +1558,9 @@ def _pt_add_node_dialog() -> None:
                 st.error("Name and Code are required.")
                 st.stop()
 
-            client = get_service_client() or get_supabase()
+            # User-scoped client: the product_tree_nodes INSERT RLS policy
+            # (is_mission_member) authorises the write (audit S4).
+            client = get_supabase()
             if not client:
                 st.error("Database not configured. Cannot save.")
                 st.stop()
