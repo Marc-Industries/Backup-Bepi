@@ -2,7 +2,7 @@
 
 **Versione:** 0.2.0  
 **Data:** Maggio 2026  
-**Status:** Production Ready (Streamlit MVP + Next.js Frontend + Supabase DB)
+**Status:** Production Ready (Streamlit + Supabase DB; Next.js frontend archiviato 2026-06-10)
 
 ---
 
@@ -50,11 +50,12 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 - ✅ Warehouse management per procurement
 - ✅ Team management con inviti email (Supabase Edge Functions + Resend)
 
-### Next.js Frontend
-- ✅ Dashboard moderno con shadcn/ui
-- ✅ Auth con Supabase
-- ✅ CRUD operations per missioni
-- ✅ Responsive design
+### Next.js Frontend (ARCHIVIATO 2026-06-10)
+> Non più usato — il team lavora solo su Streamlit. Codice spostato sul branch `archive/nextjs-frontend` e rimosso da `main` (`git checkout archive/nextjs-frontend` per recuperarlo).
+- Dashboard moderno con shadcn/ui
+- Auth con Supabase
+- CRUD operations per missioni
+- Responsive design
 
 ### Database & Auth
 - ✅ Supabase setup con 20 tabelle (missions, requirements, risks, etc.)
@@ -202,6 +203,21 @@ pytest --cov=bepi --cov-report=html
 - **Logout su F5**: token ora salvati in cookie browser (`streamlit-cookies-controller`, 7gg) e ripristinati a ogni load.
 - **Email inviti**: Edge Function `send-invitation` su **Brevo** (300 mail/gg free). Fallback graceful: se l'email fallisce, il codice invito è mostrato nell'UI. Caveat: Brevo filtra per IP, lasciare vuota la allowlist (Supabase Edge Functions usano IP dinamici).
 - **Cleanup**: rimosse ~139 righe di codice morto (secondo handler product-tree mai eseguito).
+
+## System Audit & Fixes (2026-06-10)
+
+Audit multi-agente (sicurezza, performance, qualità, test/infra) + fix:
+
+- **S1 — ruolo default**: l'onboarding non assegna più ADMIN di default a un utente senza membership (o su errore) → default `USER` (least privilege). Resta ADMIN della missione che crea. (`onboarding.py`)
+- **S6 — `check_password()`**: era chiamata ma non definita (NameError nel branch senza Supabase). Ora è un vero gate password per dev locale, fail-closed. (`auth.py`)
+- **S2 — Edge Function `send-invitation`**: era un relay email aperto. Ora valida server-side l'`invite_code` sulla tabella `invitations` e invia **solo** all'email registrata (non più a indirizzi arbitrari) + escape HTML + CORS ristretto. Redeployata.
+- **P1 — cache product tree**: `_get_product_tree()` rileggeva l'intera tabella a ogni chiamata (~18×/render); ora serve la cache e ricarica solo su primo load / cambio missione / `force_reload` / nodo appena aggiunto.
+- **P2 — cache client Supabase**: `get_service_client()` è `@st.cache_resource`; il client utente è creato una volta per sessione (era `create_client` 40-100×/render). `set_session` resta per-call → refresh token invariato.
+- **C1/C3 — codice morto**: rimosse 416 righe di onboarding duplicato mai chiamato; frontend Next.js (~6k LOC) archiviato sul branch `archive/nextjs-frontend` e tolto da `main`.
+- **I1 — `supabase/schema.sql`**: rigenerato dal DB live (mancava; c'era solo una copia stale di 10 tabelle). Snapshot generato: 22 tabelle, 25 enum, 79 policy RLS, 5 funzioni, 18 trigger. Cambiare via migration, poi rigenerare.
+- **I2 — CI**: aggiunto `.github/workflows/ci.yml` (compileall + pytest) + `conftest.py` (pytest funziona senza `PYTHONPATH=src`) + `requirements-dev.txt`.
+
+**Aperti (bucket "deliberato", non in questa sessione)**: S5 RLS split-brain `team_members` vs `mission_members` + S4 togliere il service client dalle azioni utente (il fix RLS "vero", da fare insieme e testare); C2 rimozione bridge JS / modal product-tree (è nei task aperti di Matteo in `task.txt`, lasciato a lui per non interferire con il suo lavoro in corso — ⚠️ edit/delete nodi non ha un path funzionante); P4 batch upsert budget; test sui bug fix.
 
 ---
 
