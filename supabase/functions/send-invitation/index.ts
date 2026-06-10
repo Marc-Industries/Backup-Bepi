@@ -3,36 +3,79 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY")
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "matteo.marcon24@gmail.com"
 const BEPI_URL = Deno.env.get("BEPI_URL") || "https://bepi-space.streamlit.app"
+// Auto-injected by Supabase into every Edge Function runtime.
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
+// Lock CORS to the app origin. The real caller is server-side (Streamlit, no
+// Origin header, so unaffected); this just denies browser-based abuse.
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": BEPI_URL,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
-  }
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  })
 
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 })
-  }
+// Escape interpolated values so an attacker-controlled name/mission/code cannot
+// inject HTML into the email body (phishing payloads, broken markup).
+const esc = (s: unknown) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+
+const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 })
 
   try {
-    const { recipient_email, recipient_name, mission_name, invite_code } = await req.json()
+    const body = await req.json().catch(() => ({}))
+    const invite_code = String(body.invite_code ?? "").trim()
 
-    if (!recipient_email || !invite_code) {
-      return new Response(
-        JSON.stringify({ error: "recipient_email and invite_code are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
+    // invite_code is the only trusted input; recipient/mission come from the DB.
+    if (!/^[A-Z0-9]{6,16}$/.test(invite_code)) {
+      return json({ error: "invalid invite_code" }, 400)
+    }
+    if (!BREVO_API_KEY) return json({ error: "BREVO_API_KEY not configured" }, 500)
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return json({ error: "Supabase env not available" }, 500)
     }
 
-    if (!BREVO_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "BREVO_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
+    // --- Server-side validation: the code must match a real, unredeemed
+    // invitation. This is what stops the function being an open email relay:
+    // a caller cannot send mail to an arbitrary address, only (re)send the
+    // invite to the address already stored for a pending code. ---
+    const sb = (path: string) =>
+      fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        headers: { apikey: SERVICE_ROLE_KEY!, Authorization: `Bearer ${SERVICE_ROLE_KEY}` },
+      })
+
+    const invRes = await sb(
+      `invitations?code=eq.${encodeURIComponent(invite_code)}&used_at=is.null` +
+      `&select=invite_email,invite_name,mission_id&limit=1`
+    )
+    if (!invRes.ok) return json({ error: "invitation lookup failed" }, 502)
+    const invRows = await invRes.json().catch(() => [])
+    const inv = Array.isArray(invRows) ? invRows[0] : null
+    if (!inv) return json({ error: "no pending invitation for this code" }, 404)
+
+    const recipient_email = String(inv.invite_email ?? "")
+    if (!isEmail(recipient_email)) return json({ error: "invitation has no valid email" }, 422)
+    const recipient_name = String(inv.invite_name ?? "")
+
+    // Mission name from the DB (fall back to "your mission" if unavailable).
+    let mission_name = "your mission"
+    if (inv.mission_id) {
+      const mRes = await sb(`missions?id=eq.${encodeURIComponent(inv.mission_id)}&select=name&limit=1`)
+      if (mRes.ok) {
+        const mRows = await mRes.json().catch(() => [])
+        if (Array.isArray(mRows) && mRows[0]?.name) mission_name = String(mRows[0].name)
+      }
     }
 
     const emailHtml = `
@@ -68,13 +111,13 @@ serve(async (req) => {
       <p>Budget, Engineering &amp; Project Integration</p>
     </div>
     <div class="body">
-      <p>Hi <strong>${recipient_name || "there"}</strong>,</p>
+      <p>Hi <strong>${esc(recipient_name) || "there"}</strong>,</p>
       <p>You've been invited to join the mission:</p>
-      <div class="mission-badge">🚀 ${mission_name}</div>
+      <div class="mission-badge">🚀 ${esc(mission_name)}</div>
       <p>Use the invite code below to access the project:</p>
       <div class="code-box">
         <p>Your invite code</p>
-        <div class="code">${invite_code}</div>
+        <div class="code">${esc(invite_code)}</div>
       </div>
       <div class="cta">
         <a href="${BEPI_URL}" class="btn">Open BEPI</a>
@@ -82,7 +125,7 @@ serve(async (req) => {
       <div class="steps">
         <p>How to join</p>
         <ol>
-          <li>Open BEPI at <a href="${BEPI_URL}">${BEPI_URL}</a></li>
+          <li>Open BEPI at <a href="${BEPI_URL}">${esc(BEPI_URL)}</a></li>
           <li>Go to <strong>Settings → Join Mission</strong></li>
           <li>Paste your invite code</li>
         </ol>
@@ -97,13 +140,10 @@ serve(async (req) => {
 
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      headers: {
-        "api-key": BREVO_API_KEY!,
-        "Content-Type": "application/json",
-      },
+      headers: { "api-key": BREVO_API_KEY!, "Content-Type": "application/json" },
       body: JSON.stringify({
         sender: { name: "BEPI Space", email: SENDER_EMAIL },
-        to: [{ email: recipient_email, name: recipient_name || "" }],
+        to: [{ email: recipient_email, name: recipient_name }],
         subject: `You're invited to join ${mission_name} on BEPI`,
         htmlContent: emailHtml,
       }),
@@ -112,21 +152,12 @@ serve(async (req) => {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       console.error("Brevo error:", data)
-      return new Response(
-        JSON.stringify({ error: data.message || "Failed to send email" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      )
+      return json({ error: data.message || "Failed to send email" }, 500)
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    )
+    return json({ success: true })
   } catch (err) {
     console.error("Unexpected error:", err)
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    )
+    return json({ error: String((err as Error)?.message ?? err) }, 500)
   }
 })
