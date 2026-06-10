@@ -154,11 +154,14 @@ def render_onboarding():
                 if result.data and result.data[0].get("role"):
                     st.session_state.user["role"] = result.data[0]["role"]
                 else:
-                    st.session_state.user["role"] = "ADMIN"
+                    # No membership yet → least privilege. The user becomes ADMIN
+                    # of any mission they create (add_mission grants it), and their
+                    # real per-mission role is loaded from mission_members above.
+                    st.session_state.user["role"] = "USER"
             except Exception:
-                st.session_state.user["role"] = "ADMIN"
+                st.session_state.user["role"] = "USER"
         else:
-            st.session_state.user["role"] = "ADMIN"
+            st.session_state.user["role"] = "USER"
     
     st.markdown("""
     <style>

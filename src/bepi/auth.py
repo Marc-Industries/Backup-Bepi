@@ -227,10 +227,30 @@ def logout():
         client.auth.sign_out()
     except Exception:
         pass
-    for k in ["user", "supabase_token", "supabase_refresh_token"]:
+    for k in ["user", "supabase_token", "supabase_refresh_token", "_sb_user_client"]:
         st.session_state.pop(k, None)
     st.rerun()
 
 
 def get_current_user() -> dict | None:
     return st.session_state.get("user")
+
+
+def check_password() -> bool:
+    """Local-dev / demo password gate, used ONLY when Supabase auth is not
+    configured (no [supabase] secrets). On Streamlit Cloud the Supabase branch
+    runs instead and this is never reached. Fails closed if nothing is set up."""
+    if st.session_state.get("_pwd_ok"):
+        return True
+    try:
+        expected = st.secrets["passwords"]["admin"]
+    except Exception:
+        st.error("🔒 Autenticazione non configurata: né Supabase né password locale (`[passwords].admin`).")
+        return False
+    pwd = st.text_input("Password", type="password", key="_local_pwd")
+    if pwd:
+        if pwd == expected:
+            st.session_state["_pwd_ok"] = True
+            return True
+        st.error("❌ Password errata")
+    return False

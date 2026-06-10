@@ -37,7 +37,7 @@ from bepi.ecss.phases import (PHASE_DEFINITIONS, PHASE_GATE_REVIEWS, PHASE_TRANS
     ESA_MAIT_STATUS, FRAMEWORKS, get_framework)
 from bepi.ecss.reviews import REVIEW_DEFINITIONS
 from bepi.services.reports import generate_report
-from bepi.auth import render_auth_ui, logout, get_current_user
+from bepi.auth import render_auth_ui, logout, get_current_user, check_password
 from bepi.role_permissions import ROLES, ROLE_PERMISSION_LABELS, can, require, can_edit_node, can_modify_product_tree
 from bepi.supabase_client import get_supabase, get_service_client
 from bepi.db_loader import load_mission_data, load_missions_for_user, load_mission_members
@@ -951,14 +951,22 @@ def mock_tasks():
     return nodes
 
 def _get_product_tree(force_reload=False):
-    """Read product tree from session_state, load from DB if empty."""
+    """Read product tree from session_state; reload from DB only when needed
+    (first load, mission switch, explicit force_reload, or a just-added node
+    awaiting reconciliation). This is called ~18x per render, so serving the
+    cached tree on the common read path avoids a full-table re-read each time."""
     if "product_tree" not in st.session_state:
         st.session_state["product_tree"] = []
-    
-    # Always try to load from DB to get latest data
-    client = get_service_client() or get_supabase()
+
     mission_id = st.session_state.get("active_mission_id")
-    
+    has_pending = "_pt_just_added" in st.session_state
+    if (st.session_state["product_tree"] and not force_reload
+            and not has_pending
+            and st.session_state.get("_pt_loaded_for") == mission_id):
+        return st.session_state["product_tree"]
+
+    client = get_service_client() or get_supabase()
+
     if DB_ENFORCED and not client:
         st.error("🚫 Database connection required in this mode. Please configure Supabase credentials.")
         st.stop()
@@ -966,7 +974,8 @@ def _get_product_tree(force_reload=False):
     if client and mission_id:
         try:
             result = client.table("product_tree_nodes").select("*").eq("mission_id", mission_id).execute()
-            
+            st.session_state["_pt_loaded_for"] = mission_id
+
             if result.data:
                 # Build tree from DB data
                 db_tree = []
@@ -1992,6 +2001,12 @@ def _pt_add_node_dialog() -> None:
 
             try:
                 client.table("product_tree_nodes").insert(payload).execute()
+                # Force the next _get_product_tree() to reload from DB so the new
+                # node appears despite the read cache (reconciled at line ~994).
+                st.session_state["_pt_just_added"] = {
+                    "code": new_code.strip(), "name": new_name.strip(),
+                    "level": db_level, "local_id": "",
+                }
                 st.session_state["_pt_dialog_open"] = False
                 st.success(f"✅ Added **{new_name}** to the product tree.")
                 st.rerun()
