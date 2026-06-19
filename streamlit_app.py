@@ -1423,52 +1423,13 @@ def page_overview():
     sac.steps(step_items, index=current_idx, return_index=False)
 
 
-def _render_pt_add_form(flat: list, eb: dict) -> None:
-    """Render the 'Add Node' trigger and dialog for the Product Tree.
-
-    Replaces the JS-driven modal that lived inside the components.html
-    template. The JS modal could not communicate reliably with Python on
-    Streamlit Cloud (srcdoc iframe, no setComponentValue, sandboxed
-    navigation). The native dialog below writes directly to Supabase on
-    submit, then triggers st.rerun() to redraw the tree.
-
-    Visible only to roles that can edit the product tree (PM, SE, ADMIN,
-    SSL), mirroring the gate in _process_product_tree_action.
-    """
-    from bepi.role_permissions import can
-
-    user = st.session_state.get("user", {})
-    role = user.get("role", "USER")
-    if not (role == "ADMIN" or can("edit_subsystem") or can("edit_budget")):
-        st.caption("🔒 You need PM/SE/ADMIN/SSL role to add nodes.")
-        return
-
-    mission_id = st.session_state.get("active_mission_id")
-    if not mission_id:
-        st.warning("No active mission selected.")
-        return
-
-    # The dialog reads the parent list from session_state because
-    # @st.dialog-decorated functions cannot take arguments.
-    st.session_state["_pt_add_parent_labels"] = ["(root)"] + [
-        f"{n.get('code', '')} — {n.get('name', '')}" for n in flat
-    ]
-    st.session_state["_pt_add_parent_keys"] = [None] + [
-        str(n.get("id")) for n in flat
-    ]
-
-    # Trigger button styled like the old "Add Component" header button.
-    if st.button(
-        "➕ Add Node",
-        key="pt_open_add_dialog",
-        type="primary",
-        use_container_width=False,
-    ):
-        st.session_state["_pt_dialog_open"] = True
-        st.rerun()
-
-    if st.session_state.get("_pt_dialog_open"):
-        _pt_add_node_dialog()
+# NOTE: the previous `_render_pt_add_form` helper has been removed. The
+# Add/Manage buttons now live inline in `page_product_tree`'s header, and
+# the dialogs themselves are opened at the top of the function (see
+# below) so they qualify as the first Streamlit elements of the script
+# run. Keeping the helper here would have caused a
+# `StreamlitAPIException: dialog can only be opened as the first element`
+# when the user clicked the standalone Add button.
 
 
 @st.dialog("Add Node", width="medium")
@@ -1845,6 +1806,19 @@ def page_product_tree():
     import json
     import urllib.parse
     import streamlit.components.v1 as components
+
+    # IMPORTANT: Streamlit requires `@st.dialog` calls to be the first
+    # Streamlit elements rendered in a script run. We open them here,
+    # before any `st.markdown` / `st.columns`, otherwise the API throws
+    # `StreamlitAPIException: ... only be opened as the first element`.
+    if st.session_state.get("_pt_dialog_open"):
+        _pt_add_node_dialog()
+    if st.session_state.get("_pt_manage_dialog_open"):
+        _pt_manage_nodes_dialog()
+    if st.session_state.get("_pt_edit_dialog_open"):
+        _pt_edit_node_dialog()
+    if st.session_state.get("_pt_delete_dialog_open"):
+        _pt_delete_node_dialog()
 
     flat = _get_product_tree()
     eb = _get_equip_budgets()
@@ -2450,8 +2424,8 @@ def page_product_tree():
           </button>
         </div>
       </div>
-      <!-- The "Add Node" trigger is rendered natively by Streamlit
-           (see _render_pt_add_form), so the old HTML button is gone. -->
+      <!-- The Add / Manage triggers are rendered natively by Streamlit
+           (page_product_tree header), so the old HTML button is gone. -->
     </header>
 
     <div class="content">
@@ -2711,21 +2685,6 @@ setView('tree');
                     st.rerun()
         else:
             st.caption("🔒")
-
-    if st.session_state.get("_pt_dialog_open"):
-        _pt_add_node_dialog()
-
-    # --- Manage Nodes: pick a node then Edit or Delete ---
-    if st.session_state.get("_pt_manage_dialog_open"):
-        _pt_manage_nodes_dialog()
-
-    # --- Edit/Delete dialogs driven by the manage dialog ---
-    if st.session_state.get("_pt_edit_dialog_open"):
-        _pt_edit_node_dialog()
-
-    if st.session_state.get("_pt_delete_dialog_open"):
-        _pt_delete_node_dialog()
-
 
     html_content = HTML_TEMPLATE.replace("__INJECT_ITEMS_HERE__", items_json)
     components.html(html_content, height=1000, scrolling=True)
