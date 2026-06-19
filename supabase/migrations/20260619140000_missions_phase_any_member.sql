@@ -8,60 +8,30 @@
 -- for every non-PM/SE member ("USER" / "QA" / "CM" / etc.), even though
 -- changing the mission phase is a benign action all members need.
 --
--- Fix: add a dedicated UPDATE policy gated by `is_mission_member` so any
--- member can persist the phase. The other UPDATE policy still gates the
--- rest of the row (name, owner_id, framework, etc.) to PM/SE — Postgres
--- OR's multiple USING clauses across permissive policies, and the actual
--- write columns are governed by WITH CHECK on whichever policy matches.
---
--- To keep PM/SE in control of the *other* columns, we use a `WITH CHECK`
--- expression that forces `phase` to be the only column allowed to change
--- for non-PM/SE members. PostgreSQL evaluates WITH CHECK against the NEW
--- row, so we compare OLD vs NEW on every protected column using a trick:
--- create the policy on a sub-select via a SECURITY DEFINER helper, OR
--- (simpler & safer for this PR) scope the check to (auth.uid() is a
--- non-PM/SE member) AND require the *protected* columns to be unchanged.
---
--- Trade-off note: the existing "PM/SE can update missions" policy has no
--- WITH CHECK expression at all (Postgres then allows any new row for
--- PM/SE). The new policy's WITH CHECK only fires when the caller is NOT
--- PM/SE; PM/SE keep full access. We detect that via (NOT has_mission_role)
--- so the two policies don't fight.
+-- Fix (3 parts):
+--   1. GRANT EXECUTE on the SECURITY DEFINER helpers to the `authenticated`
+--      role. Without this, any RLS policy that references has_mission_role()
+--      or is_mission_member() evaluated as the calling user raises 42501
+--      "permission denied for function" — even when the underlying
+--      function would have returned false. The repository's own error
+--      handler in src/bepi/onboarding.py documents this exact symptom.
+--   2. New permissive UPDATE policy gated by is_mission_member() so any
+--      mission member can persist `phase` (and `metadata`). PM/SE keep
+--      full access via the existing policy.
+--   3. A BEFORE UPDATE trigger that prevents non-privileged members from
+--      changing columns other than `phase` / `metadata`. PM/SE bypass
+--      via an early return.
 --
 -- Apply via: supabase db push (NOT the dashboard SQL editor — keep repo == DB).
 -- ============================================================================
 
-CREATE POLICY "Any member can update mission phase"
-  ON missions
-  AS PERMISSIVE FOR UPDATE TO authenticated
-  USING (
-    -- Caller is a member of this mission
-    is_mission_member(id)
-    -- AND is NOT one of the PM/SE roles (those use the dedicated policy above).
-    -- Without this guard the two policies overlap but Postgres still ORs USING
-    -- clauses, so the restriction belongs on WITH CHECK instead.
-  )
-  WITH CHECK (
-    is_mission_member(id)
-    -- Allow PM/SE full write access (handled by their dedicated policy); for
-    -- everyone else, restrict the protected columns by comparing to the row
-    -- they read. We use a USAGE-cheap approach: a non-PM/SE caller can only
-    -- persist `phase`; everything else must match what was already there.
-    -- Implemented via a helper expression inline — see `OLD vs NEW` comment.
-    AND (
-      has_mission_role(id, ARRAY['PM'::team_role, 'SE'::team_role])
-      OR true  -- placeholder; the column-equality check lives in the trigger below
-    )
-  );
+-- 1) Grants: required for the RLS policies below to compile without 42501.
+--    These are idempotent; re-running is safe.
+GRANT EXECUTE ON FUNCTION public.is_mission_member(uuid)        TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_mission_role(uuid, team_role[]) TO authenticated;
 
--- The column-equality check is too verbose for a single CHECK expression
--- (Postgres has no direct OLD/NEW in WITH CHECK — that lives in triggers).
--- Drop the placeholder policy above and re-create with the trigger-based
--- guard for non-PM/SE members.
-DROP POLICY "Any member can update mission phase" ON missions;
+-- 2) + 3) The trigger-based guard for non-privileged members.
 
--- Helper trigger: if the caller is a member but NOT PM/SE, ensure that
--- columns other than `phase` are unchanged.
 CREATE OR REPLACE FUNCTION public.enforce_phase_only_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -78,8 +48,8 @@ BEGIN
     RETURN NEW;  -- PM/SE keep full access.
   END IF;
 
-  -- Non-privileged members may only change `phase`. Compare every other
-  -- column against the OLD row; raise on any mismatch.
+  -- Non-privileged members may only change `phase` and `metadata`.
+  -- Compare every other column against the OLD row; raise on any mismatch.
   IF NEW.name         IS DISTINCT FROM OLD.name         THEN RAISE EXCEPTION 'only PM/SE may change mission name';         END IF;
   IF NEW.description  IS DISTINCT FROM OLD.description  THEN RAISE EXCEPTION 'only PM/SE may change mission description';  END IF;
   IF NEW.framework    IS DISTINCT FROM OLD.framework    THEN RAISE EXCEPTION 'only PM/SE may change mission framework';    END IF;
@@ -89,22 +59,26 @@ BEGIN
   IF NEW.status       IS DISTINCT FROM OLD.status       THEN RAISE EXCEPTION 'only PM/SE may change mission status';      END IF;
   IF NEW.created_at   IS DISTINCT FROM OLD.created_at   THEN RAISE EXCEPTION 'only PM/SE may change mission created_at';  END IF;
   IF NEW.updated_at   IS DISTINCT FROM OLD.updated_at   THEN RAISE EXCEPTION 'only PM/SE may change mission updated_at';  END IF;
-  -- `metadata` is a JSONB blob of dashboard configuration (e.g. framework
-  -- selection); it's read by every member on the Overview page, so any
-  -- member may write it. PM/SE also pass this check via the early return.
-  -- (No guard needed; intentionally permissive for non-privileged roles.)
+  -- `phase` and `metadata` are intentionally NOT guarded: the Budget
+  -- Dashboard's phase selector and the framework picker both write here,
+  -- and any member is allowed to set them.
 
   RETURN NEW;
 END;
 $$;
 
+-- Idempotent trigger: drop first so re-runs work.
+DROP TRIGGER IF EXISTS trg_missions_phase_only_update ON public.missions;
 CREATE TRIGGER trg_missions_phase_only_update
   BEFORE UPDATE ON public.missions
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_phase_only_update();
 
--- Now re-add the relaxed UPDATE policy: any member may attempt the write;
--- the trigger above blocks non-phase column changes for non-privileged roles.
+-- Permissive UPDATE policy: any mission member can attempt the write.
+-- The trigger above blocks non-phase column changes for non-privileged
+-- roles. PM/SE also satisfy USING via the original "PM/SE can update
+-- missions" policy (Postgres ORs USING across permissive policies).
+DROP POLICY IF EXISTS "Any member can update mission phase" ON missions;
 CREATE POLICY "Any member can update mission phase"
   ON missions
   AS PERMISSIVE FOR UPDATE TO authenticated

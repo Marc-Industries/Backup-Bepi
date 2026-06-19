@@ -2716,15 +2716,30 @@ def page_budgets():
                     if mission_id in st.session_state.missions:
                         st.session_state.missions[mission_id]["mission_phase"] = phase
                 except Exception as e:
-                    # 42501 = PostgreSQL permission denied. The new RLS policy
-                    # "Any member can update mission phase" (migration
-                    # 20260619140000) authorises this write for any member;
-                    # if we still see 42501 here it means either the policy
-                    # wasn't applied yet, or the trigger rejected a side
-                    # column change. Log full payload for the maintainer.
+                    # PostgreSQL error codes:
+                    #   42501 — permission denied (RLS / missing EXECUTE on a
+                    #            SECURITY DEFINER function called from a policy).
+                    #   'P0001' — RAISE EXCEPTION from a trigger.
+                    #   '42501' inside a PostgREST 401 also surfaces as
+                    #            "permission denied for function has_mission_role"
+                    #            when migration 20260619140000 has not been
+                    #            applied yet, or when the user has no row in
+                    #            mission_members for this mission.
+                    err_code = None
+                    err_msg = str(e)
+                    if hasattr(e, "args") and e.args and isinstance(e.args[0], dict):
+                        err_code = e.args[0].get("code")
+                    if err_code == "42501" or "has_mission_role" in err_msg:
+                        st.warning(
+                            "⚠️ Could not save phase to DB: you don't have permission on this mission. "
+                            "If you're a member, ask the mission owner to apply migration "
+                            "supabase/migrations/20260619140000_missions_phase_any_member.sql "
+                            "(grants EXECUTE on has_mission_role/is_mission_member + new policy)."
+                        )
+                    else:
+                        st.warning(f"⚠️ Could not save phase to DB: {e}")
                     import logging
-                    logging.getLogger(__name__).exception("phase update failed")
-                    st.warning(f"⚠️ Could not save phase to DB: {e}")
+                    logging.getLogger(__name__).exception("phase update failed (code=%s)", err_code)
     with ctrl2:
         mass_limit = st.number_input("Mass limit (kg, wet)", min_value=0.0, value=350.0, step=10.0, key="_bud_mass_limit")
     with ctrl3:
