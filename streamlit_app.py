@@ -1432,46 +1432,47 @@ def page_overview():
 # when the user clicked the standalone Add button.
 
 
-@st.dialog("Add Node", width="medium")
-def _pt_add_node_dialog() -> None:
-    """Streamlit-native modal for creating a product tree node.
+# ---------------------------------------------------------------------------
+# Product Tree dialogs (Streamlit 1.58-compatible).
+#
+# Streamlit 1.58 added `_assert_first_dialog_to_be_opened`: opening a
+# SECOND `@st.dialog` decorator in the same script run raises
+# `StreamlitAPIException: Only one dialog is allowed to be opened...`,
+# even if the first one is closed before the second one is opened. The
+# old layout had 4 decorators (Add/Edit/Delete/Manage) — Streamlit
+# counts every "open() call" it sees, not every currently-open dialog,
+# so the user hit the error after the first interaction.
+#
+# Strategy: a SINGLE `@st.dialog("Product Tree Action")` whose body
+# dispatches on `st.session_state["_pt_active"]` to one of four plain
+# helpers (_pt_render_add / edit / delete / manage). The body swaps on
+# rerun, so only one decorator is ever instantiated per script run.
+# ---------------------------------------------------------------------------
 
-    Mirrors the layout of the previous JS modal: Name + Code on the first
-    row, Level + Parent on the second, TRL/Quantity/Mass on the third, with
-    a Cancel/Add action row at the bottom. Submits directly to Supabase
-    via the same client used by _process_product_tree_action.
-    """
+
+def _pt_render_add() -> None:
+    """Body of the Add Node flow, rendered inside `_pt_action_dialog`."""
     parent_labels = st.session_state.get("_pt_add_parent_labels", ["(root)"])
     parent_keys = st.session_state.get("_pt_add_parent_keys", [None])
     mission_id = st.session_state.get("active_mission_id")
 
-    # --- Header / intro ---
     st.caption("Define the specs of the new product tree element.")
 
-    # --- Row 1: Name + Code ---
     c1, c2 = st.columns(2)
     with c1:
         new_name = st.text_input(
-            "NAME",
-            placeholder="e.g. ADCS Sensor",
-            key="_pt_new_name",
+            "NAME", placeholder="e.g. ADCS Sensor", key="_pt_new_name"
         )
     with c2:
         new_code = st.text_input(
-            "CODE",
-            placeholder="e.g. ADCS-001",
-            key="_pt_new_code",
+            "CODE", placeholder="e.g. ADCS-001", key="_pt_new_code"
         )
 
-    # --- Row 2: Level + Parent ---
     c3, c4 = st.columns(2)
     with c3:
         level_options = ["spacecraft", "subsystem", "equipment", "component"]
         new_level = st.selectbox(
-            "LEVEL",
-            level_options,
-            index=2,
-            key="_pt_new_level",
+            "LEVEL", level_options, index=2, key="_pt_new_level"
         )
     with c4:
         parent_idx = st.selectbox(
@@ -1483,7 +1484,6 @@ def _pt_add_node_dialog() -> None:
         )
         new_parent_id = parent_keys[parent_idx] if parent_idx else None
 
-    # --- Row 3: TRL / Qty / Mass ---
     c5, c6, c7 = st.columns(3)
     with c5:
         new_trl = st.number_input(
@@ -1504,12 +1504,10 @@ def _pt_add_node_dialog() -> None:
         )
 
     st.divider()
-
-    # --- Action row ---
     acol1, acol2 = st.columns([1, 1])
     with acol1:
         if st.button("Cancel", key="_pt_cancel", use_container_width=True):
-            st.session_state["_pt_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
             st.rerun()
     with acol2:
         if st.button(
@@ -1550,13 +1548,11 @@ def _pt_add_node_dialog() -> None:
 
             try:
                 client.table("product_tree_nodes").insert(payload).execute()
-                # Force the next _get_product_tree() to reload from DB so the new
-                # node appears despite the read cache (reconciled at line ~994).
                 st.session_state["_pt_just_added"] = {
                     "code": new_code.strip(), "name": new_name.strip(),
                     "level": db_level, "local_id": "",
                 }
-                st.session_state["_pt_dialog_open"] = False
+                st.session_state.pop("_pt_active", None)
                 st.success(f"✅ Added **{new_name}** to the product tree.")
                 st.rerun()
             except Exception as e:
@@ -1564,20 +1560,16 @@ def _pt_add_node_dialog() -> None:
                 # Keep the dialog open so the user can retry.
 
 
-@st.dialog("Edit Node", width="medium")
-def _pt_edit_node_dialog() -> None:
-    """Streamlit-native modal for editing an existing product tree node.
-
-    Pre-filled with the node's current data. Saves via UPDATE on
-    `product_tree_nodes` (matched by id).
-    """
+def _pt_render_edit() -> None:
+    """Body of the Edit Node flow, rendered inside `_pt_action_dialog`."""
     target_id = st.session_state.get("_pt_edit_target_id")
     flat = _get_product_tree()
     node = next((n for n in flat if str(n.get("id")) == str(target_id)), None)
     if node is None:
         st.error("Node not found — it may have been deleted.")
         if st.button("Close", key="_pt_edit_close_missing"):
-            st.session_state["_pt_edit_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
+            st.session_state.pop("_pt_edit_target_id", None)
             st.rerun()
         return
 
@@ -1650,7 +1642,7 @@ def _pt_edit_node_dialog() -> None:
     acol1, acol2 = st.columns([1, 1])
     with acol1:
         if st.button("Cancel", key="_pt_edit_cancel", use_container_width=True):
-            st.session_state["_pt_edit_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
             st.session_state.pop("_pt_edit_target_id", None)
             st.rerun()
     with acol2:
@@ -1678,7 +1670,7 @@ def _pt_edit_node_dialog() -> None:
                 client.table("product_tree_nodes").update(payload).eq(
                     "id", str(target_id)
                 ).execute()
-                st.session_state["_pt_edit_dialog_open"] = False
+                st.session_state.pop("_pt_active", None)
                 st.session_state.pop("_pt_edit_target_id", None)
                 st.success(f"✅ Updated **{new_name}**.")
                 st.rerun()
@@ -1686,20 +1678,19 @@ def _pt_edit_node_dialog() -> None:
                 st.error(f"Failed to save: {e}")
 
 
-@st.dialog("Delete Node", width="medium")
-def _pt_delete_node_dialog() -> None:
-    """Streamlit-native confirmation modal for deleting a product tree node."""
+def _pt_render_delete() -> None:
+    """Body of the Delete Node flow, rendered inside `_pt_action_dialog`."""
     target_id = st.session_state.get("_pt_delete_target_id")
     flat = _get_product_tree()
     node = next((n for n in flat if str(n.get("id")) == str(target_id)), None)
     if node is None:
         st.error("Node not found — it may have already been deleted.")
         if st.button("Close", key="_pt_delete_close_missing"):
-            st.session_state["_pt_delete_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
+            st.session_state.pop("_pt_delete_target_id", None)
             st.rerun()
         return
 
-    # Count descendants so the user knows the blast radius.
     children = [n for n in flat if str(n.get("parent_id")) == str(target_id)]
 
     st.warning(
@@ -1711,7 +1702,7 @@ def _pt_delete_node_dialog() -> None:
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Cancel", key="_pt_delete_cancel", use_container_width=True):
-            st.session_state["_pt_delete_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
             st.session_state.pop("_pt_delete_target_id", None)
             st.rerun()
     with c2:
@@ -1724,10 +1715,8 @@ def _pt_delete_node_dialog() -> None:
                 st.error("Database not configured. Cannot delete.")
                 st.stop()
             try:
-                # DB cascade handles descendants if FK ON DELETE CASCADE exists;
-                # if not, we delete recursively in Python.
                 _pt_recursive_delete(client, str(target_id))
-                st.session_state["_pt_delete_dialog_open"] = False
+                st.session_state.pop("_pt_active", None)
                 st.session_state.pop("_pt_delete_target_id", None)
                 st.success(f"✅ Deleted **{node.get('code')}**.")
                 st.rerun()
@@ -1744,17 +1733,13 @@ def _pt_recursive_delete(client, node_id: str) -> None:
     client.table("product_tree_nodes").delete().eq("id", str(node_id)).execute()
 
 
-@st.dialog("Manage Nodes", width="large")
-def _pt_manage_nodes_dialog() -> None:
-    """Picker dialog: select a node, then choose Edit or Delete.
-
-    The iframe table is read-only, so all row actions go through here.
-    """
+def _pt_render_manage() -> None:
+    """Body of the Manage picker, rendered inside `_pt_action_dialog`."""
     flat = _get_product_tree()
     if not flat:
         st.info("No nodes yet. Use ➕ Add to create the first one.")
         if st.button("Close", key="_pt_manage_close_empty"):
-            st.session_state["_pt_manage_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
             st.rerun()
         return
 
@@ -1784,8 +1769,8 @@ def _pt_manage_nodes_dialog() -> None:
             type="primary", use_container_width=True,
         ):
             st.session_state["_pt_edit_target_id"] = target_id
-            st.session_state["_pt_edit_dialog_open"] = True
-            st.session_state["_pt_manage_dialog_open"] = False
+            # Stay inside the same dialog; just swap to the edit body.
+            st.session_state["_pt_active"] = "edit"
             st.rerun()
     with c2:
         if st.button(
@@ -1793,13 +1778,35 @@ def _pt_manage_nodes_dialog() -> None:
             use_container_width=True,
         ):
             st.session_state["_pt_delete_target_id"] = target_id
-            st.session_state["_pt_delete_dialog_open"] = True
-            st.session_state["_pt_manage_dialog_open"] = False
+            st.session_state["_pt_active"] = "delete"
             st.rerun()
     with c3:
         if st.button("Close", key="_pt_manage_close", use_container_width=True):
-            st.session_state["_pt_manage_dialog_open"] = False
+            st.session_state.pop("_pt_active", None)
             st.rerun()
+
+
+@st.dialog("Product Tree Action")
+def _pt_action_dialog() -> None:
+    """Unified dialog for Add / Edit / Delete / Manage.
+
+    Body dispatches on `st.session_state["_pt_active"]` so we never open
+    more than one `@st.dialog` decorator per script run — Streamlit
+    1.58's `_assert_first_dialog_to_be_opened` would otherwise raise.
+    """
+    active = st.session_state.get("_pt_active")
+    if active == "add":
+        _pt_render_add()
+    elif active == "edit":
+        _pt_render_edit()
+    elif active == "delete":
+        _pt_render_delete()
+    elif active == "manage":
+        _pt_render_manage()
+    else:
+        # No action selected — close automatically.
+        st.session_state.pop("_pt_active", None)
+        st.rerun()
 
 
 def page_product_tree():
@@ -1807,18 +1814,13 @@ def page_product_tree():
     import urllib.parse
     import streamlit.components.v1 as components
 
-    # IMPORTANT: Streamlit requires `@st.dialog` calls to be the first
-    # Streamlit elements rendered in a script run. We open them here,
-    # before any `st.markdown` / `st.columns`, otherwise the API throws
-    # `StreamlitAPIException: ... only be opened as the first element`.
-    if st.session_state.get("_pt_dialog_open"):
-        _pt_add_node_dialog()
-    if st.session_state.get("_pt_manage_dialog_open"):
-        _pt_manage_nodes_dialog()
-    if st.session_state.get("_pt_edit_dialog_open"):
-        _pt_edit_node_dialog()
-    if st.session_state.get("_pt_delete_dialog_open"):
-        _pt_delete_node_dialog()
+    # IMPORTANT: Streamlit 1.58 requires `@st.dialog` calls to be the
+    # first Streamlit elements rendered in a script run, AND only ONE
+    # dialog may be opened per run. We use a single unified
+    # `_pt_action_dialog()` that dispatches on `_pt_active`, so this is
+    # the only place we touch the dialog decorator.
+    if st.session_state.get("_pt_active"):
+        _pt_action_dialog()
 
     flat = _get_product_tree()
     eb = _get_equip_budgets()
@@ -2673,7 +2675,7 @@ setView('tree');
                     st.session_state["_pt_add_parent_keys"] = [None] + [
                         str(n.get("id")) for n in flat
                     ]
-                    st.session_state["_pt_dialog_open"] = True
+                    st.session_state["_pt_active"] = "add"
                     st.rerun()
             with btn_c2:
                 if st.button(
@@ -2681,7 +2683,7 @@ setView('tree');
                     key="pt_open_manage_dialog",
                     use_container_width=True,
                 ):
-                    st.session_state["_pt_manage_dialog_open"] = True
+                    st.session_state["_pt_active"] = "manage"
                     st.rerun()
         else:
             st.caption("🔒")
