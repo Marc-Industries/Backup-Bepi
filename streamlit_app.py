@@ -2716,6 +2716,14 @@ def page_budgets():
                     if mission_id in st.session_state.missions:
                         st.session_state.missions[mission_id]["mission_phase"] = phase
                 except Exception as e:
+                    # 42501 = PostgreSQL permission denied. The new RLS policy
+                    # "Any member can update mission phase" (migration
+                    # 20260619140000) authorises this write for any member;
+                    # if we still see 42501 here it means either the policy
+                    # wasn't applied yet, or the trigger rejected a side
+                    # column change. Log full payload for the maintainer.
+                    import logging
+                    logging.getLogger(__name__).exception("phase update failed")
                     st.warning(f"⚠️ Could not save phase to DB: {e}")
     with ctrl2:
         mass_limit = st.number_input("Mass limit (kg, wet)", min_value=0.0, value=350.0, step=10.0, key="_bud_mass_limit")
@@ -3902,6 +3910,8 @@ def page_ecss():
             st.session_state.missions[mission_id]["mission_framework"] = fw_name
             st.session_state.missions[mission_id]["metadata"] = updated_meta
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("framework/phase update failed")
             st.warning(f"⚠️ Could not save framework/phase to DB: {e}")
 
     # Phase info metrics
