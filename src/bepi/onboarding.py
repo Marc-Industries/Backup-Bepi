@@ -966,7 +966,11 @@ def _sync_team_members_from_db(client, user_id: str):
             if user_role_in_mission:
                 st.session_state.user["role"] = user_role_in_mission
             elif user_id and not st.session_state.user.get("role"):
-                st.session_state.user["role"] = "ADMIN"
+                # S1 fix (least privilege): no membership in this mission
+                # -> do NOT promote to ADMIN. Leave role unset; can()
+                # falls back to USER. ADMIN promotion is reserved for
+                # the explicit add_mission() grant path.
+                st.session_state.user.pop("role", None)
             
             st.session_state.team_members = team_list
             return

@@ -5255,28 +5255,53 @@ def page_team():
                 if members:
                     st.markdown("**Members:** " + ", ".join(f"{m['name']}" + (f" ({m.get('subsystem', '')})" if m.get('subsystem') else "") for m in members))
                 perms = role_def["permissions"]
-                perm_labels = {
-                    "approve_milestone": "Approve milestones & review gates",
-                    "approve_risk": "Approve risk register changes",
-                    "approve_budget": "Approve budget allocations",
-                    "edit_schedule": "Edit project schedule",
-                    "view_all": "View all mission data",
-                    "approve_requirement": "Approve requirement status changes",
-                    "edit_requirement": "Create/edit requirements",
-                    "edit_budget": "Edit budget allocations",
-                    "edit_subsystem": "Edit own subsystem data",
-                    "update_progress": "Update task progress",
-                    "edit_fmeca": "Edit FMECA entries",
-                    "view_subsystem": "View own subsystem data",
-                    "approve_deliverable": "Approve review deliverables",
-                    "approve_verification": "Approve verification evidence",
-                    "edit_ncr": "Create/edit non-conformance reports",
-                    "approve_document": "Approve document baselines",
-                    "manage_baseline": "Manage configuration baselines",
-                    "update_verification": "Update verification test results",
-                }
+                # Use the shared label map from role_permissions so any new
+                # permission added there is reflected here without code drift.
+                # Falling back to the raw key keeps the UI usable even if a
+                # permission is registered without a label.
                 for p in perms:
-                    st.markdown(f"- ✓ {perm_labels.get(p, p)}")
+                    label = ROLE_PERMISSION_LABELS.get(p, p)
+                    st.markdown(f"- ✓ {label}")
+
+        st.divider()
+        st.markdown("##### Per-Member Permission Audit")
+        st.caption("Effective permissions for every member of this mission, derived from their assigned role. Useful to verify that a freshly-invited user has the lines they were granted.")
+        team = get_team()
+        if not team:
+            st.info("No team members in this mission yet.")
+        else:
+            audit_rows = []
+            for m in team:
+                role_id = m.get("role", "USER")
+                role_def = ROLES.get(role_id, ROLES["USER"])
+                perm_keys = role_def.get("permissions", [])
+                audit_rows.append({
+                    "Member": m.get("name", "—"),
+                    "Role": role_def.get("name", role_id),
+                    "Subsystem": m.get("subsystem", "—") or "—",
+                    "Permissions": ", ".join(ROLE_PERMISSION_LABELS.get(p, p) for p in perm_keys) or "(none)",
+                    "#": len(perm_keys),
+                })
+            st.dataframe(
+                pd.DataFrame(audit_rows),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "Member": st.column_config.TextColumn(disabled=True),
+                    "Role": st.column_config.TextColumn(disabled=True),
+                    "Subsystem": st.column_config.TextColumn(disabled=True),
+                    "Permissions": st.column_config.TextColumn(width="large", disabled=True),
+                    "#": st.column_config.NumberColumn("# perms", disabled=True),
+                },
+            )
+            # Self-check: if a member's role string isn't in ROLES, flag it.
+            unknown_roles = [m["name"] for m in team if m.get("role") not in ROLES]
+            if unknown_roles:
+                st.error(
+                    "⚠️ These members have a role that is not in ROLES: "
+                    + ", ".join(unknown_roles)
+                    + ". Their permissions fall back to USER."
+                )
 
         st.divider()
         st.markdown("##### Approval Workflow")
