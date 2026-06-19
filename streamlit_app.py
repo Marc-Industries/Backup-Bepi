@@ -1603,6 +1603,244 @@ def _pt_add_node_dialog() -> None:
                 # Keep the dialog open so the user can retry.
 
 
+@st.dialog("Edit Node", width="medium")
+def _pt_edit_node_dialog() -> None:
+    """Streamlit-native modal for editing an existing product tree node.
+
+    Pre-filled with the node's current data. Saves via UPDATE on
+    `product_tree_nodes` (matched by id).
+    """
+    target_id = st.session_state.get("_pt_edit_target_id")
+    flat = _get_product_tree()
+    node = next((n for n in flat if str(n.get("id")) == str(target_id)), None)
+    if node is None:
+        st.error("Node not found — it may have been deleted.")
+        if st.button("Close", key="_pt_edit_close_missing"):
+            st.session_state["_pt_edit_dialog_open"] = False
+            st.rerun()
+        return
+
+    st.caption(f"Editing **{node.get('code')}** — {node.get('name')}")
+
+    parent_labels = ["(root)"] + [
+        f"{n.get('code', '')} — {n.get('name', '')}"
+        for n in flat if str(n.get("id")) != str(target_id)
+    ]
+    parent_keys = [None] + [
+        str(n.get("id")) for n in flat if str(n.get("id")) != str(target_id)
+    ]
+    cur_parent = node.get("parent_id")
+    try:
+        parent_idx = parent_keys.index(str(cur_parent)) if cur_parent else 0
+    except ValueError:
+        parent_idx = 0
+
+    level_options = ["satellite", "subsystem", "equipment", "component"]
+    try:
+        level_idx = level_options.index(node.get("level"))
+    except ValueError:
+        level_idx = 0
+
+    c1, c2 = st.columns(2)
+    with c1:
+        new_name = st.text_input(
+            "NAME", value=str(node.get("name", "")), key="_pt_edit_name"
+        )
+    with c2:
+        new_code = st.text_input(
+            "CODE", value=str(node.get("code", "")), key="_pt_edit_code"
+        )
+
+    c3, c4 = st.columns(2)
+    with c3:
+        new_level = st.selectbox(
+            "LEVEL", level_options, index=level_idx, key="_pt_edit_level"
+        )
+    with c4:
+        parent_pick = st.selectbox(
+            "PARENT",
+            range(len(parent_labels)),
+            format_func=lambda i: parent_labels[i],
+            index=parent_idx,
+            key="_pt_edit_parent",
+        )
+        new_parent_id = parent_keys[parent_pick] if parent_pick else None
+
+    c5, c6, c7 = st.columns(3)
+    with c5:
+        new_trl = st.number_input(
+            "TRL", min_value=1, max_value=9,
+            value=int(node.get("trl") or 5), step=1, key="_pt_edit_trl"
+        )
+    with c6:
+        new_qty = st.number_input(
+            "QTY", min_value=1,
+            value=int(node.get("quantity") or 1), step=1, key="_pt_edit_qty"
+        )
+    with c7:
+        new_mass = st.number_input(
+            "MASS (kg)", min_value=0.0,
+            value=float(node.get("mass_kg") or 0.0), step=0.1,
+            key="_pt_edit_mass",
+            help="Equipment-level only.",
+        )
+
+    st.divider()
+    acol1, acol2 = st.columns([1, 1])
+    with acol1:
+        if st.button("Cancel", key="_pt_edit_cancel", use_container_width=True):
+            st.session_state["_pt_edit_dialog_open"] = False
+            st.session_state.pop("_pt_edit_target_id", None)
+            st.rerun()
+    with acol2:
+        if st.button(
+            "Save Changes", key="_pt_edit_save", type="primary", use_container_width=True
+        ):
+            if not new_name.strip() or not new_code.strip():
+                st.error("Name and Code are required.")
+                st.stop()
+
+            client = get_service_client() or get_supabase()
+            if not client:
+                st.error("Database not configured. Cannot save.")
+                st.stop()
+
+            payload = {
+                "parent_id": new_parent_id,
+                "level": new_level,
+                "code": new_code.strip(),
+                "name": new_name.strip(),
+                "quantity": int(new_qty),
+                "trl": int(new_trl),
+            }
+            try:
+                client.table("product_tree_nodes").update(payload).eq(
+                    "id", str(target_id)
+                ).execute()
+                st.session_state["_pt_edit_dialog_open"] = False
+                st.session_state.pop("_pt_edit_target_id", None)
+                st.success(f"✅ Updated **{new_name}**.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save: {e}")
+
+
+@st.dialog("Delete Node", width="medium")
+def _pt_delete_node_dialog() -> None:
+    """Streamlit-native confirmation modal for deleting a product tree node."""
+    target_id = st.session_state.get("_pt_delete_target_id")
+    flat = _get_product_tree()
+    node = next((n for n in flat if str(n.get("id")) == str(target_id)), None)
+    if node is None:
+        st.error("Node not found — it may have already been deleted.")
+        if st.button("Close", key="_pt_delete_close_missing"):
+            st.session_state["_pt_delete_dialog_open"] = False
+            st.rerun()
+        return
+
+    # Count descendants so the user knows the blast radius.
+    children = [n for n in flat if str(n.get("parent_id")) == str(target_id)]
+
+    st.warning(
+        f"⚠️ **Delete `{node.get('code')}` — {node.get('name')}?**\n\n"
+        f"This will remove the node and all its descendants "
+        f"({len(children)} direct children, plus their subtrees)."
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Cancel", key="_pt_delete_cancel", use_container_width=True):
+            st.session_state["_pt_delete_dialog_open"] = False
+            st.session_state.pop("_pt_delete_target_id", None)
+            st.rerun()
+    with c2:
+        if st.button(
+            "Delete", key="_pt_delete_confirm", type="primary",
+            use_container_width=True,
+        ):
+            client = get_service_client() or get_supabase()
+            if not client:
+                st.error("Database not configured. Cannot delete.")
+                st.stop()
+            try:
+                # DB cascade handles descendants if FK ON DELETE CASCADE exists;
+                # if not, we delete recursively in Python.
+                _pt_recursive_delete(client, str(target_id))
+                st.session_state["_pt_delete_dialog_open"] = False
+                st.session_state.pop("_pt_delete_target_id", None)
+                st.success(f"✅ Deleted **{node.get('code')}**.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to delete: {e}")
+
+
+def _pt_recursive_delete(client, node_id: str) -> None:
+    """Delete a node and all its descendants, bottom-up."""
+    flat = _get_product_tree()
+    children = [str(n["id"]) for n in flat if str(n.get("parent_id")) == str(node_id)]
+    for cid in children:
+        _pt_recursive_delete(client, cid)
+    client.table("product_tree_nodes").delete().eq("id", str(node_id)).execute()
+
+
+@st.dialog("Manage Nodes", width="large")
+def _pt_manage_nodes_dialog() -> None:
+    """Picker dialog: select a node, then choose Edit or Delete.
+
+    The iframe table is read-only, so all row actions go through here.
+    """
+    flat = _get_product_tree()
+    if not flat:
+        st.info("No nodes yet. Use ➕ Add to create the first one.")
+        if st.button("Close", key="_pt_manage_close_empty"):
+            st.session_state["_pt_manage_dialog_open"] = False
+            st.rerun()
+        return
+
+    options = [
+        f"{n.get('code', '')} — {n.get('name', '')} [{n.get('level', '')}]"
+        for n in flat
+    ]
+    keys = [str(n.get("id")) for n in flat]
+    cur_idx = st.session_state.get("_pt_manage_idx", 0)
+    if cur_idx >= len(options):
+        cur_idx = 0
+    pick = st.selectbox(
+        "Select node",
+        range(len(options)),
+        format_func=lambda i: options[i],
+        index=cur_idx,
+        key="_pt_manage_pick",
+    )
+    st.session_state["_pt_manage_idx"] = pick
+    target_id = keys[pick]
+
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button(
+            "✏️ Edit", key="_pt_manage_edit_btn",
+            type="primary", use_container_width=True,
+        ):
+            st.session_state["_pt_edit_target_id"] = target_id
+            st.session_state["_pt_edit_dialog_open"] = True
+            st.session_state["_pt_manage_dialog_open"] = False
+            st.rerun()
+    with c2:
+        if st.button(
+            "🗑️ Delete", key="_pt_manage_delete_btn",
+            use_container_width=True,
+        ):
+            st.session_state["_pt_delete_target_id"] = target_id
+            st.session_state["_pt_delete_dialog_open"] = True
+            st.session_state["_pt_manage_dialog_open"] = False
+            st.rerun()
+    with c3:
+        if st.button("Close", key="_pt_manage_close", use_container_width=True):
+            st.session_state["_pt_manage_dialog_open"] = False
+            st.rerun()
+
+
 def page_product_tree():
     import json
     import urllib.parse
@@ -2148,36 +2386,6 @@ def page_product_tree():
   }
   .create-btn:hover { background: #388bfd; }
 
-  
-  .action-dropdown {
-    display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
-    margin-top: 4px;
-    background: var(--bg-modal);
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    z-index: 100;
-    min-width: 120px;
-    overflow: hidden;
-  }
-  .action-dropdown.open { display: block; }
-  .dropdown-item {
-    padding: 10px 16px;
-    cursor: pointer;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.15s;
-    font-size: 13px;
-  }
-  .dropdown-item:hover { background: #21262d; color: var(--text-primary); }
-  .dropdown-item.danger:hover { background: rgba(248, 81, 73, 0.1); color: #f85149; }
-  .action-wrap { position: relative; display: inline-block; }
-  
   /* SVG icons */
   svg { display: inline-block; vertical-align: middle; }
 </style>
@@ -2228,7 +2436,8 @@ def page_product_tree():
   <main class="main">
     <header class="header">
       <div class="header-left">
-        <span class="header-title">Project Hierarchy</span>
+        <!-- Title is rendered by Streamlit above the iframe so the Add Node
+             button can sit on the same row, aligned to the right. -->
         <div class="view-switcher">
           <button class="view-btn active" id="btn-tree" onclick="setView('tree')" title="Visualizzazione Albero">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h10M7 18h10M5 8v8"/></svg>
@@ -2371,27 +2580,16 @@ function renderTree() {
 }
 
 function renderTable() {
+  // Edit/Delete moved to a Streamlit-native dialog opened from the
+  // page header (see `_pt_open_actions_dialog`). The iframe table is
+  // intentionally read-only now.
   let rows = items.map(item => `
     <tr>
       <td class="cell-id">${item.id}</td>
       <td class="cell-code">${item.code}</td>
       <td class="cell-name">${item.name}</td>
       <td><span class="level-badge badge-${item.level}">${item.level}</span></td>
-      <td>
-        <div class="action-wrap">
-            <button class="action-btn" onclick="toggleDropdown(event, '${item.id}')">${icons.dots}</button>
-            <div class="action-dropdown" id="dropdown-${item.id}">
-                <div class="dropdown-item" onclick="openEditModal('${item.id}')">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2-2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> 
-                    Edit
-                </div>
-                <div class="dropdown-item danger" onclick="deleteNode('${item.id}')">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    Delete
-                </div>
-            </div>
-        </div>
-      </td>
+      <td style="text-align:right;color:var(--text-muted);font-size:12px;">Use toolbar →</td>
     </tr>`).join('');
 
   document.getElementById('view-table').innerHTML = `
@@ -2461,25 +2659,6 @@ function setPage(el, name) {
   triggerStreamlit("nav_page", {page: name});
 }
 
-// ── ACTIONS ──
-function toggleDropdown(e, id) {
-  e.stopPropagation();
-  document.querySelectorAll('.action-dropdown').forEach(d => {
-     if(d.id !== 'dropdown-'+id) d.classList.remove('open');
-  });
-  document.getElementById('dropdown-' + id).classList.toggle('open');
-}
-
-document.addEventListener('click', () => {
-   document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('open'));
-});
-
-function deleteNode(id) {
-  if(confirm("Vuoi davvero eliminare questo nodo e tutti i suoi discendenti?")) {
-     triggerStreamlit("delete_node", {id: id});
-  }
-}
-
 // ── INIT ──
 setView('tree');
 </script>
@@ -2487,12 +2666,66 @@ setView('tree');
 </html>
 """
 
-    # --- Add Node form (Streamlit native, replaces the JS modal) ---
-    # The form is rendered as a compact collapsible above the tree so the
-    # tree visual stays untouched. The submit handler writes directly to
-    # Supabase via the same client used by _process_product_tree_action,
-    # then triggers st.rerun() to redraw the tree from the new DB state.
-    _render_pt_add_form(flat, eb)
+    # --- Header bar (title left, Add/Manage buttons right) ---
+    # The title lives here in Streamlit (not inside the iframe) so the buttons
+    # can sit on the same row, aligned to the right. The iframe keeps its
+    # own view-switcher (Tree/Table/Budget) below this header.
+    hdr_l, hdr_r = st.columns([3, 1], vertical_alignment="center")
+    with hdr_l:
+        st.markdown(
+            "<h2 style='margin:0;padding:8px 0;font-size:22px;"
+            "font-weight:700;color:#e6edf3;'>Project Hierarchy</h2>",
+            unsafe_allow_html=True,
+        )
+    with hdr_r:
+        # Render the Add Node + Manage Nodes triggers inline. The dialogs are
+        # opened via session_state and st.rerun.
+        from bepi.role_permissions import can as _can
+        _user = st.session_state.get("user", {})
+        _role = _user.get("role", "USER")
+        _can_edit = (_role == "ADMIN" or _can("edit_subsystem") or _can("edit_budget"))
+        if _can_edit:
+            btn_c1, btn_c2 = st.columns(2)
+            with btn_c1:
+                if st.button(
+                    "➕ Add",
+                    key="pt_open_add_dialog",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    st.session_state["_pt_add_parent_labels"] = ["(root)"] + [
+                        f"{n.get('code', '')} — {n.get('name', '')}" for n in flat
+                    ]
+                    st.session_state["_pt_add_parent_keys"] = [None] + [
+                        str(n.get("id")) for n in flat
+                    ]
+                    st.session_state["_pt_dialog_open"] = True
+                    st.rerun()
+            with btn_c2:
+                if st.button(
+                    "✏️ Manage",
+                    key="pt_open_manage_dialog",
+                    use_container_width=True,
+                ):
+                    st.session_state["_pt_manage_dialog_open"] = True
+                    st.rerun()
+        else:
+            st.caption("🔒")
+
+    if st.session_state.get("_pt_dialog_open"):
+        _pt_add_node_dialog()
+
+    # --- Manage Nodes: pick a node then Edit or Delete ---
+    if st.session_state.get("_pt_manage_dialog_open"):
+        _pt_manage_nodes_dialog()
+
+    # --- Edit/Delete dialogs driven by the manage dialog ---
+    if st.session_state.get("_pt_edit_dialog_open"):
+        _pt_edit_node_dialog()
+
+    if st.session_state.get("_pt_delete_dialog_open"):
+        _pt_delete_node_dialog()
+
 
     html_content = HTML_TEMPLATE.replace("__INJECT_ITEMS_HERE__", items_json)
     components.html(html_content, height=1000, scrolling=True)
