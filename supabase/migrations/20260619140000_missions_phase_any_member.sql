@@ -52,11 +52,18 @@ BEGIN
   -- Compare every other column against the OLD row; raise on any mismatch.
   IF NEW.name         IS DISTINCT FROM OLD.name         THEN RAISE EXCEPTION 'only PM/SE may change mission name';         END IF;
   IF NEW.description  IS DISTINCT FROM OLD.description  THEN RAISE EXCEPTION 'only PM/SE may change mission description';  END IF;
-  IF NEW.framework    IS DISTINCT FROM OLD.framework    THEN RAISE EXCEPTION 'only PM/SE may change mission framework';    END IF;
-  IF NEW.owner_id     IS DISTINCT FROM OLD.owner_id     THEN RAISE EXCEPTION 'only PM/SE may change mission owner';       END IF;
-  IF NEW.start_date   IS DISTINCT FROM OLD.start_date   THEN RAISE EXCEPTION 'only PM/SE may change mission start_date';  END IF;
-  IF NEW.end_date     IS DISTINCT FROM OLD.end_date     THEN RAISE EXCEPTION 'only PM/SE may change mission end_date';    END IF;
-  IF NEW.status       IS DISTINCT FROM OLD.status       THEN RAISE EXCEPTION 'only PM/SE may change mission status';      END IF;
+  -- The list below mirrors the actual missions schema in
+  -- supabase/schema.sql (lines 181-198). NO framework / owner_id /
+  -- start_date / end_date / status — those don't exist on this table.
+  IF NEW.orbit_type         IS DISTINCT FROM OLD.orbit_type         THEN RAISE EXCEPTION 'only PM/SE may change mission orbit_type';         END IF;
+  IF NEW.target_launch_date IS DISTINCT FROM OLD.target_launch_date THEN RAISE EXCEPTION 'only PM/SE may change mission target_launch_date'; END IF;
+  IF NEW.customer           IS DISTINCT FROM OLD.customer           THEN RAISE EXCEPTION 'only PM/SE may change mission customer';           END IF;
+  IF NEW.prime_contractor   IS DISTINCT FROM OLD.prime_contractor   THEN RAISE EXCEPTION 'only PM/SE may change mission prime_contractor';   END IF;
+  IF NEW.ecss_tailoring     IS DISTINCT FROM OLD.ecss_tailoring     THEN RAISE EXCEPTION 'only PM/SE may change mission ecss_tailoring';     END IF;
+  IF NEW.mass_limit_kg      IS DISTINCT FROM OLD.mass_limit_kg      THEN RAISE EXCEPTION 'only PM/SE may change mission mass_limit_kg';      END IF;
+  IF NEW.power_limit_w      IS DISTINCT FROM OLD.power_limit_w      THEN RAISE EXCEPTION 'only PM/SE may change mission power_limit_w';      END IF;
+  IF NEW.propellant_mass_kg IS DISTINCT FROM OLD.propellant_mass_kg THEN RAISE EXCEPTION 'only PM/SE may change mission propellant_mass_kg'; END IF;
+  IF NEW.lifetime_years     IS DISTINCT FROM OLD.lifetime_years     THEN RAISE EXCEPTION 'only PM/SE may change mission lifetime_years';     END IF;
   IF NEW.created_at   IS DISTINCT FROM OLD.created_at   THEN RAISE EXCEPTION 'only PM/SE may change mission created_at';  END IF;
   IF NEW.updated_at   IS DISTINCT FROM OLD.updated_at   THEN RAISE EXCEPTION 'only PM/SE may change mission updated_at';  END IF;
   -- `phase` and `metadata` are intentionally NOT guarded: the Budget
