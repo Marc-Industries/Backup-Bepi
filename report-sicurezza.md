@@ -2,7 +2,8 @@
 
 **Data analisi:** 2026-05-06
 (IL TUTTO è RISOLVIBILE CON REDNER E CON FUNZIONE WEB SERVICE COSì DA POTER METTERE LE VARIABILI LI SENZA ESPORRE API O ALTRO NEL CODICE, IL RESTO è SPIEGATO QUI SOTTO):
-**Ambito:** Backend Python/FastAPI, Frontend Next.js, Database Supabase PostgreSQL, Deploy Vercel/Streamlit Cloud  
+**Ambito:** Backend Python/FastAPI + Streamlit dashboard, Database Supabase PostgreSQL, Deploy Streamlit Cloud
+**Data ultimo aggiornamento:** 2026-06-20 (rimossi riferimenti a Next.js/Vercel archiviati il 2026-06-10)
 **Livello rischio complessivo:** ALTO
 
 ---

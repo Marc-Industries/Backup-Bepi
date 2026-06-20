@@ -2,7 +2,7 @@
 
 **Versione:** 0.2.0  
 **Data:** Maggio 2026  
-**Status:** Production Ready (Streamlit + Supabase DB; Next.js frontend archiviato 2026-06-10)
+**Status:** Production Ready (Streamlit + Supabase DB)
 
 ---
 
@@ -20,9 +20,9 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 ### Architettura
 
 - **Backend**: Python/FastAPI con SQLAlchemy + Supabase PostgreSQL
-- **Frontend**: Next.js (Vercel) + Streamlit (Streamlit Cloud)
+- **Frontend**: Streamlit (Streamlit Cloud) — unico runtime, Next.js rimosso 2026-06-10
 - **Database**: Supabase con 20+ tabelle, RLS per multi-mission RBAC
-- **Deploy**: Vercel (frontend) + Streamlit Cloud (demo) + Supabase (DB/functions)
+- **Deploy**: Streamlit Cloud (app) + Supabase (DB/functions)
 
 ---
 
@@ -51,11 +51,7 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 - ✅ Team management con inviti email (Supabase Edge Functions + Resend)
 
 ### Next.js Frontend (ARCHIVIATO 2026-06-10)
-> Non più usato — il team lavora solo su Streamlit. Codice spostato sul branch `archive/nextjs-frontend` e rimosso da `main` (`git checkout archive/nextjs-frontend` per recuperarlo).
-- Dashboard moderno con shadcn/ui
-- Auth con Supabase
-- CRUD operations per missioni
-- Responsive design
+> Codice storico sul branch `archive/nextjs-frontend` (non più mantenuto, rimosso da `main`). Runtime attuale: solo Streamlit. (`git checkout archive/nextjs-frontend` per recuperarlo se serve solo lettura.)
 
 ### Database & Auth
 - ✅ Supabase setup con 20 tabelle (missions, requirements, risks, etc.)
@@ -65,12 +61,11 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 - ✅ Real-time subscriptions
 
 ### Deploy & DevOps
-- ✅ Vercel deploy per frontend
-- ✅ Streamlit Cloud per demo
-- ✅ Supabase per DB/functions
+- ✅ Streamlit Cloud per app
+- ✅ Supabase per DB + Edge Functions
 - ✅ Docker compose per sviluppo locale
-- ✅ Alembic migrations
 - ✅ Pytest suite
+- ⚠️ Alembic configurato ma non usato (migration reali in `supabase/migrations/`)
 
 ---
 
@@ -78,7 +73,7 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 - **Fase 1 completata**: Core engine (models, services, schemas, API, CLI, Streamlit MVP)
 - **Fase 2 completata**: Report generation ✅, MATLAB bridge ✅, Excel I/O ✅, seed scripts ✅
 - **Fase 3 completata**: Integrazioni esterne ✅, ESA/NASA framework ✅, full editability ✅, multi-satellite product tree ✅, empty-state robustness ✅
-- **Fase 4 completata**: Next.js frontend ✅, Supabase DB ✅, Vercel deploy ✅, Streamlit Cloud deploy ✅, Auth ✅, CRUD editing ✅
+- **Fase 4 completata**: Next.js frontend ✅ (poi archiviato), Supabase DB ✅, Streamlit Cloud deploy ✅, Auth ✅, CRUD editing ✅
 - **Fase 5 completata**: Multi-mission DB con RBAC ✅ (20 tabelle, RLS per missione, profili utente, ruoli)
 
 ---
@@ -88,31 +83,22 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 ### Sviluppo Locale
 
 ```bash
-# Backend
-cd src/bepi
-PYTHONPATH=src python -m uvicorn app:app --reload
+# Backend (FastAPI, opzionale in dev)
+PYTHONPATH=src python -m uvicorn bepi.app:create_app --factory --reload
 
-# Streamlit
+# Streamlit (runtime principale)
 PYTHONPATH=src streamlit run streamlit_app.py
-
-# Frontend
-cd frontend
-npm run dev
 ```
 
 ### Deploy
 
 ```bash
-# Frontend
-cd frontend
-npm run build && npm run start
-
-# Streamlit
-streamlit run streamlit_app.py --server.port 8501
+# Streamlit Cloud (auto-deploy dal branch main)
+# Niente build locale necessario.
 
 # Supabase
 supabase db push
-supabase functions deploy
+supabase functions deploy send-invitation
 ```
 
 ---
