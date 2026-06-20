@@ -1,5 +1,0 @@
-  4 tasks
-  □ Build st.form Add Node for Product Tree
-  □ Remove pt_bridge component
-  □ Remove JS-only Add Node modal HTML/JS
-  □ Verify syntax, commit, push to backup
