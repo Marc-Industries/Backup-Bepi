@@ -1,0 +1,51 @@
+{
+  "revision": "ECSS-E-ST-10C Rev.1 (2017-02-15)",
+  "lessons": [
+    {
+      "id": "LL-001",
+      "caso": "Hubble — aberrazione sferica dello specchio primario",
+      "programma": "HST / NASA, 1990",
+      "cosa_successe": "Lo specchio primario fu lavorato con una curvatura leggermente errata; il difetto non fu intercettato prima del lancio e degradò le immagini fino alla missione di servizio del 1993.",
+      "causa_radice": "Il null corrector usato per guidare la lavorazione era mal assemblato; misure indipendenti che segnalavano l'anomalia furono ignorate. Radice di PROCESSO — assenza di cross-check indipendente su una verifica critica.",
+      "ecss": [
+        "ECSS-E-ST-10-02"
+      ],
+      "drd": [
+        "DRD-VP"
+      ],
+      "lesson": "Una verifica critica affidata a un singolo strumento senza ridondanza indipendente è un single point of failure di processo. I dati discordanti vanno riconciliati, non scartati.",
+      "fonte": "The Hubble Space Telescope Optical Systems Failure Report (Allen Board, NASA, 1990)",
+      "tags": [
+        "lesson",
+        "anti-pattern",
+        "verification",
+        "review-independence"
+      ]
+    },
+    {
+      "id": "LL-002",
+      "caso": "Mars Climate Orbiter — mismatch di unità di misura",
+      "programma": "MCO / NASA, 1999",
+      "cosa_successe": "Il software di terra produceva impulsi in unità imperiali mentre la navigazione li attendeva in unità metriche; l'errore di traiettoria distrusse la sonda.",
+      "causa_radice": "Disallineamento di unità a un'interfaccia software tra due team, non intercettato da verifica end-to-end né da controllo di interfaccia formale. Radice di INTERFACE MANAGEMENT.",
+      "ecss": [
+        "ECSS-E-ST-10-02",
+        "ECSS-E-ST-10-24"
+      ],
+      "drd": [
+        "DRD-VP",
+        "DRD-ICD",
+        "DRD-SEP"
+      ],
+      "lesson": "Le convenzioni condivise a un'interfaccia (unità, formati, riferimenti) vanno dichiarate, verificate end-to-end e non assunte. Un ICD non controllato è un fallimento latente.",
+      "fonte": "Mars Climate Orbiter Mishap Investigation Board — Phase I Report (NASA, 1999)",
+      "tags": [
+        "lesson",
+        "anti-pattern",
+        "interface-management",
+        "verification",
+        "tailoring"
+      ]
+    }
+  ]
+}

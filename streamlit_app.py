@@ -36,6 +36,7 @@ from bepi.ecss.phases import (PHASE_DEFINITIONS, PHASE_GATE_REVIEWS, PHASE_TRANS
     ESA_TRL_TARGETS, NASA_TRL_TARGETS, ESA_PHASE_ACTIVITIES, NASA_PHASE_ACTIVITIES,
     ESA_MAIT_STATUS, FRAMEWORKS, get_framework)
 from bepi.ecss.reviews import REVIEW_DEFINITIONS
+from bepi.ecss import corpus as ecss_corpus, gates as ecss_gates
 from bepi.services.reports import generate_report
 from bepi.auth import render_auth_ui, logout, get_current_user, check_password
 from bepi.role_permissions import ROLES, ROLE_PERMISSION_LABELS, can, require, can_edit_node, can_modify_product_tree
@@ -3884,6 +3885,203 @@ def page_schedule():
                 st.warning("Task name is required.")
 
 
+def _ecss_can_edit() -> bool:
+    return bool(can("edit_requirement") or can("approve_deliverable") or can("manage_baseline"))
+
+
+def _ecss_deliverables_tab(mission_id, current_phase, gate):
+    """Review Gate board — mission progress on the ECSS deliverable axis.
+    Reuses the (previously unused) reviews / review_deliverables tables."""
+    st.markdown("##### Mission Progress — deliverable per review")
+    st.caption(f"Baseline: **{ecss_corpus.current_revision()}** · Table A-1 (contrib. J. Coccimiglio)")
+    if not mission_id:
+        st.info("Seleziona o crea una missione prima.")
+        return
+    editable = _ecss_can_edit()
+    reviews = ecss_corpus.reviews_in_corpus()
+    if not reviews:
+        st.warning("Corpus ECSS non caricato.")
+        return
+    default_idx = reviews.index(gate) if gate in reviews else 0
+    review = st.selectbox("Review gate", reviews, index=default_idx, key="_ecss_gate_sel")
+
+    try:
+        gates_data = ecss_gates.load_review_gates(mission_id)
+    except Exception as e:
+        st.error(f"Caricamento review gate fallito: {e}")
+        gates_data = {}
+
+    if gates_data:
+        tot = sum(len(g["deliverables"]) for g in gates_data.values())
+        done = sum(1 for g in gates_data.values() for d in g["deliverables"] if d.get("status") == "approved")
+        if tot:
+            st.progress(done / tot, text=f"Deliverable ECSS approvati (tutte le review avviate): {done}/{tot}")
+
+    gate_row = gates_data.get(review)
+    expected = ecss_corpus.deliverables_for_review(review)
+    st.markdown(f"**{review}** — {len(expected)} deliverable attesi dalla Table A-1")
+
+    if not gate_row or not gate_row.get("deliverables"):
+        df = pd.DataFrame([{"DRD": d["id"], "Deliverable": d["title"],
+                            "Standard": d["standard"], "DRD ref": d["drd_ref"]} for d in expected])
+        st.dataframe(df, hide_index=True, width="stretch")
+        if editable:
+            if st.button(f"➕ Inizializza {review} dalla Table A-1", type="primary", key=f"_ecss_init_{review}"):
+                n = ecss_gates.initialise_gate(mission_id, review)
+                st.success(f"Aggiunti {n} deliverable a {review}.")
+                st.rerun()
+        else:
+            st.caption("Ruolo in sola lettura — chiedi a un PM/SE di inizializzare il gate.")
+        return
+
+    dels = gate_row["deliverables"]
+    done = sum(1 for d in dels if d.get("status") == "approved")
+    st.progress(done / len(dels) if dels else 0.0, text=f"{review}: {done}/{len(dels)} approvati")
+
+    STATUS = ["not_started", "in_progress", "draft", "under_review", "approved"]
+    lessons_map = {}
+    rows = []
+    for d in dels:
+        ll = ecss_corpus.lessons_for_deliverable(d.get("drd_code") or "")
+        lessons_map[d["id"]] = ll
+        rows.append({"_id": d["id"], "DRD": d.get("drd_code"), "Deliverable": d.get("title"),
+                     "Status": d.get("status") or "not_started", "Owner": d.get("owner") or "", "⚠": len(ll)})
+    df = pd.DataFrame(rows)
+    if editable:
+        edited = st.data_editor(
+            df, hide_index=True, width="stretch",
+            column_config={
+                "_id": None,
+                "DRD": st.column_config.TextColumn(disabled=True),
+                "Deliverable": st.column_config.TextColumn(disabled=True),
+                "Status": st.column_config.SelectboxColumn("Status", options=STATUS, required=True),
+                "⚠": st.column_config.NumberColumn("⚠", help="Lessons learned che questo deliverable previene", disabled=True),
+            },
+            key=f"_ecss_deliv_editor_{review}",
+        )
+        if st.button("💾 Salva stato deliverable", key=f"_ecss_save_{review}"):
+            changed = 0
+            for _, r in edited.iterrows():
+                orig = next((d for d in dels if d["id"] == r["_id"]), {})
+                if r["Status"] != (orig.get("status") or "not_started") or (r["Owner"] or "") != (orig.get("owner") or ""):
+                    ecss_gates.set_deliverable_status(r["_id"], r["Status"], r["Owner"] or None)
+                    changed += 1
+            st.success(f"Salvate {changed} modifiche.")
+            st.rerun()
+    else:
+        st.dataframe(df.drop(columns=["_id"]), hide_index=True, width="stretch")
+
+    any_lessons = any(lessons_map.values())
+    if any_lessons:
+        st.markdown("###### ⚠ Lessons learned agganciate a questi deliverable")
+        for d in dels:
+            ll = lessons_map.get(d["id"]) or []
+            if ll:
+                with st.expander(f"{d.get('drd_code')} — {d.get('title')} · {len(ll)} lesson"):
+                    for x in ll:
+                        st.markdown(
+                            f"**{x['id']} — {x['caso']}** ({x['programma']})  \n"
+                            f"*Causa radice:* {x['causa_radice']}  \n"
+                            f"*Lezione:* {x['lesson']}  \n"
+                            f"<small>Fonte: {x['fonte']}</small>", unsafe_allow_html=True)
+
+    with_templates = [d for d in expected if ecss_corpus.drd_template(d["id"])]
+    if with_templates:
+        st.markdown("###### 📄 DRD scaffold — struttura normata del deliverable")
+        pick = st.selectbox("Deliverable con template", [f"{d['id']} — {d['title']}" for d in with_templates],
+                            key=f"_ecss_drd_pick_{review}")
+        tmpl = ecss_corpus.drd_template(pick.split(" — ")[0])
+        if tmpl:
+            # strip the Obsidian YAML frontmatter for a clean render
+            if tmpl.startswith("---"):
+                parts = tmpl.split("---", 2)
+                tmpl = parts[2].lstrip() if len(parts) == 3 else tmpl
+            with st.expander("Mostra scaffold sezione-per-sezione"):
+                st.markdown(tmpl)
+
+
+def _ecss_tailoring_tab(mission_id):
+    """Per-mission tailoring workspace (Table 7-2) → missions.ecss_tailoring."""
+    st.markdown("##### Tailoring — cosa si applica a questo progetto")
+    st.caption(f"Baseline: **{ecss_corpus.current_revision()}** · Table 7-2 (contrib. J. Coccimiglio)")
+    if not mission_id:
+        st.info("Seleziona o crea una missione prima.")
+        return
+    editable = bool(can("edit_requirement") or can("manage_baseline"))
+    ptypes = ecss_corpus.product_types()
+    if not ptypes:
+        st.warning("Corpus tailoring non caricato.")
+        return
+    try:
+        stored = ecss_gates.load_tailoring(mission_id)
+    except Exception as e:
+        st.error(f"Caricamento tailoring fallito: {e}")
+        stored = {}
+    default_pt = stored.get("product_type") or ptypes[min(1, len(ptypes) - 1)]
+    pt = st.selectbox("Tipo di prodotto", ptypes,
+                      index=ptypes.index(default_pt) if default_pt in ptypes else 0, key="_ecss_pt")
+    tp = ecss_corpus.tailoring_points(pt)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Applicabili (X)", tp.get("applicable", "—"))
+    c2.metric("Da decidere (//)", tp.get("decisions", "—"))
+    c3.metric("Non applicabili (-)", tp.get("not_applicable", "—"))
+    points = tp.get("points", [])
+    if not points:
+        st.info("Nessuna decisione di tailoring per questo product type: a livello *Space system* si applica tutto.")
+        return
+    st.markdown(f"**{len(points)} decisioni** (celle `//`): ognuna va risolta e **motivata** — il razionale è la parte che vale in review.")
+    prev = {d["req"]: d for d in stored.get("decisions", [])} if stored.get("product_type") == pt else {}
+    DEC = ["APPLICABILE", "NON APPLICABILE", "MODIFICATO"]
+    df = pd.DataFrame([{"Req.": r, "Decisione": prev.get(r, {}).get("decision", "APPLICABILE"),
+                        "Razionale": prev.get(r, {}).get("rationale", "")} for r in points])
+    if editable:
+        edited = st.data_editor(
+            df, hide_index=True, width="stretch",
+            column_config={
+                "Req.": st.column_config.TextColumn(disabled=True),
+                "Decisione": st.column_config.SelectboxColumn("Decisione", options=DEC, required=True),
+                "Razionale": st.column_config.TextColumn("Razionale", width="large"),
+            },
+            key=f"_ecss_tail_{pt}",
+        )
+        if st.button("💾 Salva tailoring", key="_ecss_tail_save"):
+            decisions = [{"req": r["Req."], "decision": r["Decisione"], "rationale": r["Razionale"]}
+                         for _, r in edited.iterrows()]
+            ecss_gates.save_tailoring(mission_id, {"product_type": pt,
+                                                   "revision": ecss_corpus.current_revision(),
+                                                   "decisions": decisions})
+            st.success("Tailoring salvato.")
+            st.rerun()
+        impact_df = edited
+    else:
+        st.dataframe(df, hide_index=True, width="stretch")
+        impact_df = df
+
+    excluded = {r["Req."] for _, r in impact_df.iterrows() if r["Decisione"] == "NON APPLICABILE"}
+    if excluded:
+        fallen = [d for d in ecss_corpus.deliverables() if set(d.get("called_by", [])) & excluded]
+        st.markdown("###### Impatto sui deliverable (tailoring → cosa cade)")
+        if fallen:
+            for d in fallen:
+                why = ", ".join(sorted(set(d["called_by"]) & excluded))
+                st.markdown(f"- ⛔ **{d['title']}** cade — invocato dai requisiti esclusi ({why})")
+        else:
+            st.caption("Nessun deliverable con `chiamato_da` fra i requisiti esclusi (mappatura seed finora solo per il SEP).")
+
+
+def _ecss_lessons_tab():
+    st.markdown("##### Lessons Learned — perché esiste la clausola")
+    st.caption("Fallimenti da report d'inchiesta ufficiali (contrib. J. Coccimiglio). Compaiono in automatico sui deliverable che li avrebbero intercettati (tab *Deliverable*).")
+    for x in ecss_corpus.lessons():
+        with st.expander(f"{x['id']} — {x['caso']}"):
+            st.markdown(f"**Programma:** {x['programma']}")
+            st.markdown(f"**Cosa successe:** {x['cosa_successe']}")
+            st.markdown(f"**Causa radice:** {x['causa_radice']}")
+            st.markdown(f"**Lezione:** {x['lesson']}")
+            st.markdown(f"**ECSS:** {', '.join(x.get('ecss', []))} · **Deliverable agganciati:** {', '.join(x.get('drd', []))}")
+            st.caption(f"Fonte: {x['fonte']}")
+
+
 def page_ecss():
     colored_header(label="ECSS Framework", description="Standards, phases, reviews & margin policy", color_name="gray-70")
 
@@ -3985,7 +4183,9 @@ def page_ecss():
     st.divider()
 
     # Tabs for phase details
-    tab_review, tab_margins, tab_trl, tab_act = st.tabs(["Gate Review Details", "Margin Policy", "TRL Tracking", "Phase Activities"])
+    tab_review, tab_margins, tab_trl, tab_act, tab_deliv, tab_tail, tab_lessons = st.tabs(
+        ["Gate Review Details", "Margin Policy", "TRL Tracking", "Phase Activities",
+         "📋 Deliverables & Progress", "✂️ Tailoring", "⚠️ Lessons Learned"])
 
     with tab_review:
         if gate and gate in REVIEW_DEFINITIONS:
@@ -4109,6 +4309,15 @@ def page_ecss():
         if fw_name == "ESA":
             mait = ESA_MAIT_STATUS.get(current_phase, "N/A")
             st.markdown(f"**MAIT Status:** {mait}")
+
+    with tab_deliv:
+        _ecss_deliverables_tab(mission_id, current_phase, gate)
+
+    with tab_tail:
+        _ecss_tailoring_tab(mission_id)
+
+    with tab_lessons:
+        _ecss_lessons_tab()
 
 
 def _base_context():

@@ -205,6 +205,17 @@ Audit multi-agente (sicurezza, performance, qualità, test/infra) + fix:
 
 **Aperti (bucket "deliberato", non in questa sessione)**: S5 RLS split-brain `team_members` vs `mission_members` + S4 togliere il service client dalle azioni utente (il fix RLS "vero", da fare insieme e testare); C2 rimozione bridge JS / modal product-tree (è nei task aperti di Matteo in `task.txt`, lasciato a lui per non interferire con il suo lavoro in corso — ⚠️ edit/delete nodi non ha un path funzionante); P4 batch upsert budget; test sui bug fix.
 
+## ECSS Compliance & Mission Progress (2026-07-14)
+
+Integrato il lavoro di **Jacopo Coccimiglio** (ECSS "second brain", orientato alla produzione di deliverable) dentro BEPI. Chiave architetturale: la sua distinzione *conoscenza* (condivisa, in git) vs *dati di progetto* (per-tenant, DB+RLS) mappa 1:1 su BEPI, che aveva già gli "scaffali vuoti" — tabelle `reviews`/`review_deliverables` e campo `missions.ecss_tailoring` mai usati dall'app.
+
+- **Corpus (conoscenza, docs-as-code)**: `src/bepi/ecss/data/` (JSON) + `corpus.py` (loader framework-agnostic, cache, versionato con `revision`). Sorgente human-readable in `docs/ecss-corpus/`. Contenuto: Table A-1 (37 deliverable, ID stabili `DRD-*` che riconciliano i 3 keyset in conflitto), Table 7-2 (punti di tailoring `//` per product type), 2 lessons, scaffold DRD (SEP, VP).
+- **Layer dati-di-progetto**: `src/bepi/ecss/gates.py` — wire delle tabelle morte via **user client (RLS, audit S4)**. Review gate + stato deliverable su `reviews`/`review_deliverables`; tailoring su `missions.ecss_tailoring` jsonb. Zero nuovo schema.
+- **UI**: 3 tab nuovi nella pagina ECSS — *Deliverables & Progress* (board "sono pronto per la PDR?", % completamento = mission-progress ECSS), *Tailoring* (decisioni per-clausola + razionale + impatto tailoring→deliverable via `called_by`), *Lessons Learned* (auto-surface sui deliverable agganciati).
+- **Versioning ECSS**: ogni record porta `revision`; le missioni pinnano una baseline (`metadata.ecss_baseline`); si salvano mappature+metadati, non la prosa (link al PDF ufficiale). Change-advisory come evoluzione.
+- **Test**: `test_ecss_corpus.py` + `test_ecss_gates.py` (fake client in-memory) — 11 test, gate/tailoring verificati contro lo schema (colonne, NOT NULL, idempotenza).
+- **Aperti**: mappatura `called_by` seed solo per SEP (impatto tailoring completo quando estesa); `page_reports` usa ancora una lista DRD hardcoded (da migrare al corpus); libreria lessons 2/15-20 (roadmap Coccimiglio); RAG opzionale.
+
 ---
 
 ## Roadmap Futuro
@@ -218,5 +229,9 @@ Audit multi-agente (sicurezza, performance, qualità, test/infra) + fix:
 
 ## Contributi
 
+- **Federico Toson** — lead, systems engineering, architettura.
+- **Matteo Marcon** — sviluppo (frontend/product tree, Streamlit).
+- **Jacopo Coccimiglio** — ECSS compliance: corpus deliverable/tailoring/lessons ("second brain"), lifecycle Table A-1, matrice pre-tailoring Table 7-2. Vedi `docs/ecss-corpus/`.
+
 Questo file DEVE essere aggiornato ad ogni cambiamento significativo.  
-Ultimo aggiornamento: 29 Maggio 2026
+Ultimo aggiornamento: 14 Luglio 2026

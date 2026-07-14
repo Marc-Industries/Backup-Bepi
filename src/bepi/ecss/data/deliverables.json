@@ -1,0 +1,550 @@
+{
+  "revision": "ECSS-E-ST-10C Rev.1 (2017-02-15)",
+  "source": "ECSS-E-ST-10C Rev.1, Annex A, Table A-1 (via J. Coccimiglio)",
+  "deliverables": [
+    {
+      "id": "DRD-MDD",
+      "title": "Mission description document",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex B",
+      "reviews": [
+        "MDR",
+        "PRR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-SCR",
+      "title": "System concept report",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex C",
+      "reviews": [
+        "MDR",
+        "PRR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-PTRS",
+      "title": "Preliminary technical requirements specification",
+      "standard": "ECSS-E-ST-10-06",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "MDR",
+        "PRR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TRS",
+      "title": "Technical requirements specification",
+      "standard": "ECSS-E-ST-10-06",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "SRR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-IRD",
+      "title": "Interface requirements document",
+      "standard": "ECSS-E-ST-10-24",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-PTRS-NLL",
+      "title": "Preliminary technical requirements specification (next lower level)",
+      "standard": "ECSS-E-ST-10-06",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "PRR",
+        "SRR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TRS-NLL",
+      "title": "Technical requirements specification (next lower level)",
+      "standard": "ECSS-E-ST-10-06",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "SRR",
+        "PDR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-RJF",
+      "title": "Requirement justification file",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex O",
+      "reviews": [
+        "MDR",
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-RTM",
+      "title": "Requirements traceability matrix (next lower level)",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex N",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Requirements",
+      "called_by": []
+    },
+    {
+      "id": "DRD-SEP",
+      "title": "System engineering plan",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex D",
+      "reviews": [
+        "MDR",
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR",
+        "AR"
+      ],
+      "category": "Plans",
+      "called_by": [
+        "5.1a",
+        "5.3.4a"
+      ]
+    },
+    {
+      "id": "DRD-TP",
+      "title": "Technology plan",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex E",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TRSL",
+      "title": "Technology Readiness Status List",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex E",
+      "reviews": [
+        "MDR",
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TM",
+      "title": "Technology matrix",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex F",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-VP",
+      "title": "Verification plan",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR",
+        "AR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-AIT",
+      "title": "AIT QM/FM plan",
+      "standard": "ECSS-E-ST-10-03",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "PDR",
+        "CDR",
+        "QR",
+        "AR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-SDMP",
+      "title": "Space debris mitigation plan",
+      "standard": "ECSS-U-AS-10",
+      "drd_ref": "—",
+      "reviews": [
+        "MDR",
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-CSD",
+      "title": "Coordinate system document",
+      "standard": "ECSS-E-ST-10-09",
+      "drd_ref": "Annex A",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR"
+      ],
+      "category": "Plans",
+      "called_by": []
+    },
+    {
+      "id": "DRD-DDF",
+      "title": "Design definition file",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex G",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-DDF-NLL",
+      "title": "Design definition file (next lower level)",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex G",
+      "reviews": [
+        "PDR",
+        "CDR",
+        "QR",
+        "AR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-DJF",
+      "title": "Design justification file",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex K",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-DJF-NLL",
+      "title": "Design justification file (next lower level)",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex K",
+      "reviews": [
+        "PDR",
+        "CDR",
+        "QR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-FT",
+      "title": "Function tree",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex H",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-PT",
+      "title": "Product tree",
+      "standard": "ECSS-M-ST-10",
+      "drd_ref": "Annex B",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-ST",
+      "title": "Specification tree",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex J",
+      "reviews": [
+        "SRR",
+        "PDR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TB",
+      "title": "Technical budget",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex I",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TOR",
+      "title": "Trade off reports",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex L",
+      "reviews": [
+        "MDR",
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-ICD",
+      "title": "Interface control document",
+      "standard": "ECSS-E-ST-10-24",
+      "drd_ref": "Annex B",
+      "reviews": [
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-PUM",
+      "title": "Product user manual",
+      "standard": "ECSS-E-ST-10",
+      "drd_ref": "Annex P",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-MMD",
+      "title": "Mathematical model description",
+      "standard": "ECSS-E-ST-32",
+      "drd_ref": "Annex I",
+      "reviews": [
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR"
+      ],
+      "category": "Design",
+      "called_by": []
+    },
+    {
+      "id": "DRD-VCD",
+      "title": "Verification control document",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex B",
+      "reviews": [
+        "PRR",
+        "SRR",
+        "PDR",
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TSPEC",
+      "title": "Test specification",
+      "standard": "ECSS-E-ST-10-03",
+      "drd_ref": "Annex B",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TPROC",
+      "title": "Test procedure",
+      "standard": "ECSS-E-ST-10-03",
+      "drd_ref": "Annex C",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-TREP",
+      "title": "Test report",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex C",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-VREP",
+      "title": "Verification report",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex F",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR",
+        "ORR",
+        "FRR",
+        "LRR",
+        "CRR",
+        "ELR",
+        "MCR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-RODR",
+      "title": "Review of design report",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex D",
+      "reviews": [
+        "CDR",
+        "QR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-INSP",
+      "title": "Inspection report",
+      "standard": "ECSS-E-ST-10-02",
+      "drd_ref": "Annex E",
+      "reviews": [
+        "CDR",
+        "QR",
+        "AR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    },
+    {
+      "id": "DRD-CORR",
+      "title": "Correlation report",
+      "standard": "ECSS-E-ST-31",
+      "drd_ref": "Annex C",
+      "reviews": [
+        "CDR",
+        "QR"
+      ],
+      "category": "Verification",
+      "called_by": []
+    }
+  ]
+}

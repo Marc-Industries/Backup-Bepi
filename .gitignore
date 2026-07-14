@@ -20,6 +20,9 @@ env/
 
 # Data
 data/
+# ...but the ECSS corpus data is source (docs-as-code), not generated — keep it.
+!src/bepi/ecss/data/
+!src/bepi/ecss/data/**
 
 # Pytest
 .pytest_cache/
