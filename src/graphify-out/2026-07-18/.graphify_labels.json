@@ -30,6 +30,7 @@
   "28": "env.py",
   "29": "openlca_export.py",
   "30": "matlab_bridge.py",
+  "31": "scheduling.py",
   "32": "validation.py",
   "33": "role_permissions.py",
   "34": "drama.py",

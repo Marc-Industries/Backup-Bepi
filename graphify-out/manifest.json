@@ -65,9 +65,9 @@
     "semantic_hash": "01967d77f8c86d729845fff6f9a912f9"
   },
   "src/bepi/auth.py": {
-    "mtime": 1781880241.0157719,
-    "ast_hash": "ea090cf59d33763989ec2a40c8da66be",
-    "semantic_hash": "ea090cf59d33763989ec2a40c8da66be"
+    "mtime": 1784329884.8419223,
+    "ast_hash": "f513d00e58750f54d4dfdcee5a162375",
+    "semantic_hash": ""
   },
   "src/bepi/cli.py": {
     "mtime": 1780519554.765854,
@@ -205,8 +205,8 @@
     "semantic_hash": "ff2eb62f367a8c81b18613167de09e1f"
   },
   "src/bepi/db_loader.py": {
-    "mtime": 1784300840.5139904,
-    "ast_hash": "d80183bff6a6f6d030b42302fd705d8a",
+    "mtime": 1784329885.1075592,
+    "ast_hash": "2cfb743b87a6e5444785798248cb25e3",
     "semantic_hash": ""
   },
   "src/bepi/db_writer.py": {
@@ -385,14 +385,14 @@
     "semantic_hash": "23aece3147383d67a73afdd141ee8e4e"
   },
   "src/bepi/mock_data.py": {
-    "mtime": 1780519554.848321,
-    "ast_hash": "e192dd8121df792430dc12655f9509df",
-    "semantic_hash": "e192dd8121df792430dc12655f9509df"
+    "mtime": 1784329884.8575492,
+    "ast_hash": "8b8fcb81035ecc21ade5ff2f384f07d6",
+    "semantic_hash": ""
   },
   "src/bepi/onboarding.py": {
-    "mtime": 1781888305.5931685,
-    "ast_hash": "a147b7b30deb4fff034ae8b3ae87e7fc",
-    "semantic_hash": "a147b7b30deb4fff034ae8b3ae87e7fc"
+    "mtime": 1784329884.8575492,
+    "ast_hash": "222a7c80973ce341513c93c998ce1b03",
+    "semantic_hash": ""
   },
   "src/bepi/plugins/__init__.py": {
     "mtime": 1780519554.851322,
@@ -445,9 +445,9 @@
     "semantic_hash": "3a07578f5e38ea59337e582cc887dabd"
   },
   "src/bepi/services/risks.py": {
-    "mtime": 1780519554.866382,
-    "ast_hash": "74416ab4f77aa46b253aea678704e140",
-    "semantic_hash": "74416ab4f77aa46b253aea678704e140"
+    "mtime": 1784329884.8575492,
+    "ast_hash": "c78a1dab4b24586ecbe161b94c0df12c",
+    "semantic_hash": ""
   },
   "src/bepi/services/scheduling.py": {
     "mtime": 1780519554.8673222,
@@ -468,5 +468,40 @@
     "mtime": 1780519554.8703215,
     "ast_hash": "d405938c60065352496acd4b6dd4cc3f",
     "semantic_hash": "d405938c60065352496acd4b6dd4cc3f"
+  },
+  "src/bepi/ecss/corpus.py": {
+    "mtime": 1784329884.8419223,
+    "ast_hash": "52c42dfe63615b5a67d57e66d9ca0620",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/data/deliverables.json": {
+    "mtime": 1784329884.8419223,
+    "ast_hash": "3844a215d3205988ec16da5b269dc6b7",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/data/lessons.json": {
+    "mtime": 1784329884.8575492,
+    "ast_hash": "22dfbf2f52dddb1083424ec64e68ead9",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/data/tailoring_matrix.json": {
+    "mtime": 1784329884.8575492,
+    "ast_hash": "bd781d5638ce93e83f5c68d6fabe1f40",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/gates.py": {
+    "mtime": 1784329884.8575492,
+    "ast_hash": "e1f3c81b0d6bcb3e4438e0475290b01c",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/data/drd_templates/DRD-SEP.md": {
+    "mtime": 1784329884.8575492,
+    "ast_hash": "e622d5ad2a35dae744a6fade18f27755",
+    "semantic_hash": ""
+  },
+  "src/bepi/ecss/data/drd_templates/DRD-VP.md": {
+    "mtime": 1784329884.8575492,
+    "ast_hash": "8fd72eb40a356691354eeef33f15e70c",
+    "semantic_hash": ""
   }
 }
