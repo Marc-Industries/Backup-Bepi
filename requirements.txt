@@ -1,20 +1,27 @@
-streamlit>=1.40.0
-streamlit-cookies-controller>=0.0.4
+# Pinned to a verified-compatible set (2026-07-17). The scientific/UI core is
+# pinned exactly: an unpinned rebuild had drifted to streamlit 1.56 + plotly 6.9,
+# which crash on import (streamlit called go.layout.template.Data, removed in
+# plotly 6.x). This exact set was installed in a clean venv and all 16 key modules
+# imported together. Bump deliberately, re-testing the streamlit×plotly pair.
+streamlit==1.59.2
+plotly==6.9.0
+pandas==3.0.3
+numpy==2.5.1
+scipy==1.18.0
+openpyxl==3.1.5
+docxtpl==0.20.2
+python-docx==1.2.0
+# Supabase / transport — kept as floors (own resolver chain, no drift issue seen).
 supabase>=2.0.0
 httpx>=0.25.0
-plotly
-pandas
-numpy
-scipy
-openpyxl
-docxtpl
-python-docx
+postgrest>=0.14.0
+realtime>=0.27.0
+storage3>=0.11.0
+gotrue>=2.0.0
+# Streamlit add-ons + templating.
+streamlit-cookies-controller>=0.0.4
 streamlit-option-menu
 streamlit-antd-components
 streamlit-extras
 streamlit-plotly-events
 jinja2
-postgrest>=0.14.0
-realtime>=0.27.0
-storage3>=0.11.0
-gotrue>=2.0.0
