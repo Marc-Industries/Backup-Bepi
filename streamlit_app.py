@@ -1011,8 +1011,12 @@ elif DB_ENFORCED:
 # Settings panel (main content)
 if st.session_state.get("show_settings", False):
     with st.container(border=True):
-        st.markdown("### ⚙️ Settings")
-        
+        _sc_hdr, _sc_x = st.columns([11, 1])
+        _sc_hdr.markdown("### ⚙️ Settings")
+        if _sc_x.button("✕", key="btn_close_settings", help="Chiudi impostazioni"):
+            st.session_state.show_settings = False
+            st.rerun()
+
         st.markdown("#### Active Mission")
         all_mission_ids = list(missions.keys())
         mission_labels = {mid: missions[mid]["name"] for mid in all_mission_ids}
