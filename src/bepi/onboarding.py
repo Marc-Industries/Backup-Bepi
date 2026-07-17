@@ -1236,17 +1236,11 @@ def _finalize_onboarding(skipped: bool = False):
             del st.session_state[k]
     st.session_state.pop("_onboarding_shown", None)
 
-    # Update user role to ADMIN in Supabase Auth metadata
-    try:
-        client = get_supabase()
-        if client and hasattr(client, 'auth') and client.auth.get_user():
-            client.auth.update_user({
-                "data": {
-                    "role": "ADMIN"
-                }
-            })
-    except Exception as e:
-        st.warning(f"Could not update user role: {e}")
+    # NB: we deliberately do NOT write the role into Supabase Auth user_metadata.
+    # That field is user-writable, so persisting "ADMIN" there was a privilege-
+    # escalation vector (and defeated the S1 least-privilege fix). The authoritative
+    # role is the mission_members row created by add_mission() (ADMIN for the creator),
+    # resolved per-mission at load. The in-session role set above is enough for this run.
 
     st.balloons()
     st.rerun()

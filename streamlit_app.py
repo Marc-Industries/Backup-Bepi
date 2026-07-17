@@ -845,7 +845,7 @@ def _current_user_member() -> dict:
         "id": user.get("id", "U00"),
         "name": user.get("full_name") or user.get("email") or "You",
         "email": user.get("email", ""),
-        "role": user.get("role", "PM") if user.get("role") in ROLES else "PM",
+        "role": user.get("role") if user.get("role") in ROLES else "USER",
         "org": user.get("org", ""),
     }
 

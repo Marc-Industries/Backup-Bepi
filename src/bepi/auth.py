@@ -19,7 +19,12 @@ def _user_dict(user) -> dict:
         "id": user.id,
         "email": user.email,
         "full_name": user.user_metadata.get("full_name", "") if user.user_metadata else "",
-        "role": user.user_metadata.get("role", "USER") if user.user_metadata else "USER",
+        # Authorization role is per-mission and lives in `mission_members` (RLS-
+        # protected); it is resolved at mission load (_sync_team_members_from_db).
+        # NEVER seed it from user_metadata: that field is user-writable via the
+        # GoTrue update_user API, so trusting it here let any account self-promote
+        # to ADMIN. Start least-privilege; the real role is filled in from the DB.
+        "role": "USER",
     }
 
 
