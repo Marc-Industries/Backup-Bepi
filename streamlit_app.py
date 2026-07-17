@@ -7160,7 +7160,7 @@ def page_integrations():
                     das_xml = export_das_xml(dp)
                     st.download_button("📥 DAS XML", das_xml, "BEPI_DAS_compliance.xml", "text/xml", key="exp_das")
                 with ec2:
-                    drama_cfg = export_drama_config(dp)
+                    drama_cfg = export_drama_config(dp.altitude_km, dp.inclination_deg, dp.mass_kg, dp.cross_section_m2, mission_name=dp.mission_name)
                     st.download_button("📥 DRAMA config", drama_cfg, "BEPI_DRAMA_config.txt", "text/plain", key="exp_drama")
                 with ec3:
                     master_cfg = export_master_config(das_alt, das_area)

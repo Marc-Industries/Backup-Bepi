@@ -1,10 +1,7 @@
-"""Regression: risks loaded from the DB must be RiskItemData objects, not dicts.
-
-The app accesses risks as objects (r.risk_id, r.status, r.risk_level, r.risk_score,
-r.mitigation_strategy) in ~50 places. db_loader._map_risk used to return a dict, so
-the first mission that actually had risks stored crashed the Overview with
-AttributeError ('dict' object has no attribute 'risk_id'). The model was also
-missing risk_score / mitigation_strategy that the Risks page reads.
+"""Regression: entities loaded from the DB must be the services/ dataclasses the
+app actually uses (not dicts, not mock_data), or attribute access across the UI
+raises AttributeError. The first fully-populated mission exposed this on risks
+(Overview), tasks (Schedule/Team CPM), requirements, and FMECA.
 """
 import sys
 import types
@@ -12,11 +9,8 @@ import types
 
 def _load():
     # db_loader imports streamlit + the supabase client at module top; neither is
-    # needed for _map_risk. Stub them (the repo's local supabase/ dir also shadows
-    # the pip package). Force the stubs unconditionally — another test (e.g.
-    # test_auth_role) may have installed a *partial* bepi.supabase_client stub
-    # without get_service_client, so a guarded "if not in sys.modules" would leave
-    # db_loader's top-level import broken depending on test order.
+    # needed for the pure _map_* functions. Force the stubs (another test may have
+    # installed a partial bepi.supabase_client stub) and re-import db_loader.
     st = types.ModuleType("streamlit"); st.session_state = {}
     sys.modules["streamlit"] = st
     pe = types.ModuleType("postgrest.exceptions"); pe.APIError = Exception
@@ -26,48 +20,57 @@ def _load():
     sc.get_supabase = lambda: None
     sc.get_service_client = lambda: None
     sys.modules["bepi.supabase_client"] = sc
-    sys.modules.pop("bepi.db_loader", None)  # re-import against the fresh stub
-    from bepi.db_loader import _map_risk
-    from bepi.mock_data import RiskItemData
-    return _map_risk, RiskItemData
+    sys.modules.pop("bepi.db_loader", None)
+    from bepi import db_loader
+    return db_loader
 
 
-_ROW = {
-    "id": "uuid-1", "risk_id": "R-005", "title": "Battery degradation",
-    "description": "Capacity fade over life", "category": "technical",
-    "likelihood": 4, "consequence": 4, "risk_level": "high", "status": "open",
-    "owner": "EPS", "mitigation_strategy": "Oversize BOL capacity",
-}
-
-
-def test_map_risk_returns_object_with_expected_attributes():
-    _map_risk, RiskItemData = _load()
-    r = _map_risk(_ROW)
+def test_risk_maps_to_service_object():
+    dbl = _load()
+    from bepi.services.risks import RiskItemData
+    r = dbl._map_risk({"id": "u", "risk_id": "R-005", "title": "Batt", "description": "d",
+                       "category": "technical", "likelihood": 4, "consequence": 4,
+                       "status": "open", "owner": "EPS", "mitigation_strategy": "Oversize"})
     assert isinstance(r, RiskItemData)
-    # the accesses that used to AttributeError on a dict
-    assert r.risk_id == "R-005"
-    assert r.status == "open"
-    assert r.risk_level == "critical"          # computed: 4*4=16
-    assert r.risk_score == 16                  # property read by the Risks page
-    assert r.mitigation_strategy == "Oversize BOL capacity"  # alias of `mitigation`
+    assert r.risk_id == "R-005" and r.status == "open"
+    assert r.risk_level == "critical" and r.risk_score == 16   # computed properties
+    assert r.mitigation_strategy == "Oversize"
+    r.residual_likelihood = 2                                  # get_effective_risks assigns this
+    assert r.residual_likelihood == 2
 
 
-def test_model_score_and_mitigation_alias():
-    _map_risk, RiskItemData = _load()
-    r = RiskItemData(id="1", risk_id="R-1", title="T", description="D",
-                     category="technical", likelihood=3, consequence=5,
-                     status="open", mitigation="Do X")
-    assert r.risk_score == 15
-    assert r.risk_level == "critical"
-    assert r.mitigation_strategy == "Do X"
-    r.mitigation = "Updated"                   # write goes to the real field
-    assert r.mitigation_strategy == "Updated"  # read-only alias reflects it
+def test_task_maps_to_service_object_and_cpm_runs():
+    dbl = _load()
+    from bepi.services.scheduling import TaskData, compute_cpm
+    t = dbl._map_task({"id": "u1", "name": "SRR", "duration_days": 30,
+                       "progress_pct": 50.0, "assigned_to": "PM", "is_milestone": False})
+    assert isinstance(t, TaskData)
+    assert t.id == "u1"           # compute_cpm keys on t.id (not the mock's task_id)
+    assert t.predecessors == []   # no deps stored -> parallel
+    # the exact call that crashed page_schedule and page_team must now run
+    cpm = compute_cpm([t])
+    assert cpm.project_duration == 30
 
 
-def test_override_residual_fields_assignable():
-    """get_effective_risks assigns residual_* — the fields must exist on the model."""
-    _map_risk, RiskItemData = _load()
-    r = _map_risk(_ROW)
-    r.residual_likelihood = 2
-    r.residual_consequence = 3
-    assert (r.residual_likelihood, r.residual_consequence) == (2, 3)
+def test_requirement_maps_to_service_object_and_coverage_runs():
+    dbl = _load()
+    from bepi.services.requirements import RequirementData, coverage_report
+    r = dbl._map_requirement({"id": "u", "req_id": "SYS-001", "level": "system",
+                              "category": "functional", "title": "T", "text": "shall",
+                              "verification_status": "passed"})
+    assert isinstance(r, RequirementData)
+    assert r.req_id == "SYS-001" and r.allocated_to == []
+    coverage_report([r])          # must not raise
+
+
+def test_fmeca_maps_to_service_object():
+    dbl = _load()
+    from bepi.services.risks import FMECAEntryData
+    e = dbl._map_fmeca_entry({"id": "u", "node_id": "node-uuid", "failure_mode": "open",
+                              "failure_cause": "x", "local_effect": "y", "system_effect": "z",
+                              "severity": 4, "occurrence": 2, "detection": 3, "mitigation": "m"},
+                             {"node-uuid": "EPS-SA"})
+    assert isinstance(e, FMECAEntryData)
+    assert e.node_code == "EPS-SA"     # human code for display
+    assert e.node_id == "node-uuid"    # UUID for _normalize_fmeca_entries
+    assert e.rpn == 24                 # 4*2*3 property

@@ -53,6 +53,10 @@ class FMECAEntryData:
     detection: int  # 1-5
     mitigation: str = ""
     criticality: str | None = None  # cat_1..cat_4
+    # UUID of the product-tree node (for DB persistence). node_code is the human
+    # code (e.g. "EPS-SA"); node_id is normalised to the node UUID before save
+    # (see _normalize_fmeca_entries). Optional so mock rows without it load fine.
+    node_id: str = ""
 
     @property
     def rpn(self) -> int:

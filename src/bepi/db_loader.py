@@ -117,21 +117,24 @@ def load_mission_data(mission_id: str) -> dict:
     }
 
 
-def _map_fmeca_entry(row: dict, node_map: dict[str, str]) -> dict:
-    return {
-        "id": str(row["id"]),
-        "node_id": str(row.get("node_id", "")),
-        "node_code": node_map.get(row.get("node_id"), ""),
-        "failure_mode": row.get("failure_mode", ""),
-        "failure_cause": row.get("failure_cause", ""),
-        "local_effect": row.get("local_effect", ""),
-        "system_effect": row.get("system_effect", ""),
-        "severity": row.get("severity", 1),
-        "occurrence": row.get("occurrence", 1),
-        "detection": row.get("detection", 1),
-        "mitigation": row.get("mitigation", ""),
-        "criticality": row.get("criticality"),
-    }
+def _map_fmeca_entry(row: dict, node_map: dict[str, str]):
+    # services.risks.FMECAEntryData — page_risks reads e.node_code, e.rpn (property),
+    # e.severity, ... and _normalize_fmeca_entries reads/writes e.node_id.
+    from bepi.services.risks import FMECAEntryData
+    return FMECAEntryData(
+        id=str(row["id"]),
+        node_code=node_map.get(row.get("node_id"), "") or "",
+        failure_mode=row.get("failure_mode") or "",
+        failure_cause=row.get("failure_cause") or "",
+        local_effect=row.get("local_effect") or "",
+        system_effect=row.get("system_effect") or "",
+        severity=int(row.get("severity") or 1),
+        occurrence=int(row.get("occurrence") or 1),
+        detection=int(row.get("detection") or 1),
+        mitigation=row.get("mitigation") or "",
+        criticality=row.get("criticality"),
+        node_id=str(row.get("node_id", "")),
+    )
 
 
 def _map_mission(row: dict) -> dict:
@@ -174,64 +177,65 @@ def _map_product_tree(rows: list[dict]) -> list[dict]:
     ]
 
 
-def _map_requirement(row: dict) -> dict:
-    return {
-        "id": str(row["id"]),
-        "req_id": row["req_id"],
-        "level": row["level"],
-        "category": row["category"],
-        "title": row["title"],
-        "text": row["text"],
-        "rationale": row.get("rationale", ""),
-        "priority": row.get("priority", "mandatory"),
-        "status": row.get("status", "draft"),
-        "ecss_ref": row.get("ecss_ref", ""),
-        "source": row.get("source", ""),
-        "verification_method": row.get("verification_method", "analysis"),
-        "verification_status": row.get("verification_status", "not_started"),
-        "verification_evidence": row.get("verification_evidence", ""),
-        "parent_id": str(row["parent_id"]) if row.get("parent_id") else None,
-    }
+def _map_requirement(row: dict):
+    # services.requirements.RequirementData — page_requirements and coverage_report
+    # access r.req_id, r.verification_status, r.allocated_to, ... as attributes.
+    from bepi.services.requirements import RequirementData
+    return RequirementData(
+        id=str(row["id"]),
+        req_id=row["req_id"],
+        level=row.get("level") or "system",
+        category=row.get("category") or "functional",
+        title=row.get("title") or "",
+        text=row.get("text") or "",
+        parent_id=str(row["parent_id"]) if row.get("parent_id") else None,
+        verification_method=row.get("verification_method"),
+        verification_status=row.get("verification_status") or "not_started",
+        allocated_to=row.get("allocated_to") or [],
+    )
 
 
-def _map_risk(row: dict) -> "RiskItemData":
-    # Return a RiskItemData object, not a dict: the app accesses risks as
-    # objects (r.risk_id, r.status, r.risk_level, ...) in ~50 places — mock
-    # missions load objects, so DB missions must too, or those attribute
-    # accesses raise AttributeError (as they did on the first mission that
-    # actually had risks stored). risk_level is a computed property on the
-    # model; DB `mitigation_strategy` maps to the model's `mitigation`.
-    from bepi.mock_data import RiskItemData
+def _map_risk(row: dict):
+    # Return the SAME dataclass the app uses (services.risks.RiskItemData), not a
+    # dict: streamlit_app accesses risks as objects (r.risk_id, r.status,
+    # r.risk_level, r.risk_score, r.mitigation_strategy) in ~50 places. A dict
+    # crashed the first mission that actually had risks stored. risk_level /
+    # risk_score are computed properties on the dataclass.
+    from bepi.services.risks import RiskItemData
     return RiskItemData(
         id=str(row["id"]),
         risk_id=row["risk_id"],
         title=row.get("title") or "",
         description=row.get("description") or "",
         category=row.get("category") or "",
-        likelihood=row.get("likelihood") or 1,
-        consequence=row.get("consequence") or 1,
+        likelihood=int(row.get("likelihood") or 1),
+        consequence=int(row.get("consequence") or 1),
         status=row.get("status") or "open",
         owner=row.get("owner") or "",
-        mitigation=row.get("mitigation_strategy") or "",
+        mitigation_strategy=row.get("mitigation_strategy") or "",
         residual_likelihood=row.get("residual_likelihood"),
         residual_consequence=row.get("residual_consequence"),
     )
 
 
-def _map_task(row: dict) -> dict:
-    return {
-        "id": str(row["id"]),
-        "name": row["name"],
-        "start_date": row.get("start_date"),
-        "end_date": row.get("end_date"),
-        "duration_days": row.get("duration_days", 0),
-        "progress_pct": row.get("progress_pct", 0.0),
-        "assigned_to": row.get("assigned_to", ""),
-        "status": row.get("status", "not_started"),
-        "is_milestone": row.get("is_milestone", False),
-        "notes": row.get("notes", ""),
-        "wbs_code": "",
-    }
+def _map_task(row: dict):
+    # services.scheduling.TaskData — compute_cpm/gantt_data and page_schedule use
+    # t.id and t.predecessors (NOT the mock model's task_id/predecessor_ids). The
+    # schedule_tasks table stores no dependencies, so predecessors is empty (tasks
+    # render in the Gantt as parallel; CPM still runs).
+    from bepi.services.scheduling import TaskData
+    return TaskData(
+        id=str(row["id"]),
+        name=row.get("name") or "",
+        duration_days=int(row.get("duration_days") or 0),
+        predecessors=row.get("predecessor_ids") or [],
+        start_date=row.get("start_date"),
+        end_date=row.get("end_date"),
+        progress_pct=float(row.get("progress_pct") or 0),
+        is_milestone=bool(row.get("is_milestone")),
+        wbs_code=row.get("wbs_code") or "",
+        assigned_to=row.get("assigned_to") or "",
+    )
 
 
 def _map_member(row: dict) -> dict:
