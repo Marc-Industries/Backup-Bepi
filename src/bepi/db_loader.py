@@ -194,23 +194,28 @@ def _map_requirement(row: dict) -> dict:
     }
 
 
-def _map_risk(row: dict) -> dict:
-    return {
-        "id": str(row["id"]),
-        "risk_id": row["risk_id"],
-        "title": row["title"],
-        "description": row["description"],
-        "category": row["category"],
-        "likelihood": row["likelihood"],
-        "consequence": row["consequence"],
-        "risk_level": row["risk_level"],
-        "status": row.get("status", "open"),
-        "owner": row.get("owner", ""),
-        "mitigation_strategy": row.get("mitigation_strategy", ""),
-        "mitigation_actions": row.get("mitigation_actions", []),
-        "residual_likelihood": row.get("residual_likelihood"),
-        "residual_consequence": row.get("residual_consequence"),
-    }
+def _map_risk(row: dict) -> "RiskItemData":
+    # Return a RiskItemData object, not a dict: the app accesses risks as
+    # objects (r.risk_id, r.status, r.risk_level, ...) in ~50 places — mock
+    # missions load objects, so DB missions must too, or those attribute
+    # accesses raise AttributeError (as they did on the first mission that
+    # actually had risks stored). risk_level is a computed property on the
+    # model; DB `mitigation_strategy` maps to the model's `mitigation`.
+    from bepi.mock_data import RiskItemData
+    return RiskItemData(
+        id=str(row["id"]),
+        risk_id=row["risk_id"],
+        title=row.get("title") or "",
+        description=row.get("description") or "",
+        category=row.get("category") or "",
+        likelihood=row.get("likelihood") or 1,
+        consequence=row.get("consequence") or 1,
+        status=row.get("status") or "open",
+        owner=row.get("owner") or "",
+        mitigation=row.get("mitigation_strategy") or "",
+        residual_likelihood=row.get("residual_likelihood"),
+        residual_consequence=row.get("residual_consequence"),
+    )
 
 
 def _map_task(row: dict) -> dict:

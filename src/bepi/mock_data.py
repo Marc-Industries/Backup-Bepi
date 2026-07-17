@@ -42,7 +42,12 @@ class RiskItemData(_PositionalModel):
     mitigation: str = ""
     severity: int = 0
     occurrence: int = 0
-    
+    # Residual (post-mitigation) values applied via risk_overrides in
+    # get_effective_risks(). Optional so mock rows and DB rows without an
+    # override load fine; declared so the assignment there is valid.
+    residual_likelihood: int | None = None
+    residual_consequence: int | None = None
+
     @property
     def risk_level(self) -> str:
         score = self.likelihood * self.consequence
@@ -53,6 +58,16 @@ class RiskItemData(_PositionalModel):
         elif score >= 4:
             return "medium"
         return "low"
+
+    @property
+    def risk_score(self) -> int:
+        return self.likelihood * self.consequence
+
+    @property
+    def mitigation_strategy(self) -> str:
+        # Back-compat alias: the model field is `mitigation`, but several pages
+        # still read `mitigation_strategy`. Read-only — assign to `mitigation`.
+        return self.mitigation
 
 
 class FMECAEntryData(_PositionalModel):

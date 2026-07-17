@@ -3344,7 +3344,7 @@ def page_risks():
                             st.session_state.risk_overrides[r.risk_id] = {
                                 "status": new_s, "residual_l": new_l, "residual_c": new_c}
                             r.likelihood, r.consequence, r.status = new_l, new_c, new_s
-                            r.risk_score = new_l * new_c
+                            # risk_score is a derived property (likelihood*consequence) — no assignment
                             if DB_ENFORCED and getattr(r, "id", None):
                                 update_risk(r.id, {"likelihood": new_l, "consequence": new_c, "status": new_s})
                 st.rerun()
@@ -3465,7 +3465,7 @@ def page_risks():
                         edit_risk.description = re_desc
                         edit_risk.category = re_cat
                         edit_risk.owner = re_owner
-                        edit_risk.mitigation_strategy = re_mit
+                        edit_risk.mitigation = re_mit  # mitigation_strategy is a read-only alias
                         edit_risk.likelihood = re_l
                         edit_risk.consequence = re_c
                         if DB_ENFORCED and getattr(edit_risk, "id", None):
