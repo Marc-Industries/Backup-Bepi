@@ -216,6 +216,15 @@ Integrato il lavoro di **Jacopo Coccimiglio** (ECSS "second brain", orientato al
 - **Test**: `test_ecss_corpus.py` + `test_ecss_gates.py` (fake client in-memory) — 11 test, gate/tailoring verificati contro lo schema (colonne, NOT NULL, idempotenza).
 - **Aperti**: mappatura `called_by` seed solo per SEP (impatto tailoring completo quando estesa); `page_reports` usa ancora una lista DRD hardcoded (da migrare al corpus); libreria lessons 2/15-20 (roadmap Coccimiglio); RAG opzionale.
 
+## Security & Infra Fixes (2026-07-17)
+
+Verifica di sistema approfondita (Opus 4.8) + fix del debito emerso, per gravità:
+
+- **🔴 Privilege escalation via `user_metadata` (`9f8eae7`)**: il ruolo di sessione (`session_state.user["role"]`, letto da `can()`/`require()`) era seminato da `user.user_metadata.role` e `onboarding._finalize_onboarding` ci scriveva `"ADMIN"`. Ma `user_metadata` è **scrivibile dall'utente** (GoTrue `update_user`) → chiunque poteva auto-promuoversi ADMIN, vanificando il fix S1. Altri 2 punti defaultavano a ruoli privilegiati (PM). Fix (least privilege, ruolo autorevole = `mission_members` sotto RLS): `auth._user_dict` parte `"USER"` e non legge più i metadata; rimossa la scrittura `update_user({role:ADMIN})`; `_current_user_member` default PM→USER. Il creatore resta ADMIN perché `add_mission` glielo concede in `mission_members`. Regression test `tests/unit/test_auth_role.py`. ⚠️ Utenti con `role:ADMIN` residuo nei metadata da vecchie sessioni: ora inerte (non più letto), volendo ripulibile con un admin-API pass.
+- **🟠 Dipendenze non pinnate (`e5bf09e`)**: `requirements.txt` lasciava plotly/pandas/numpy/scipy senza versione e non c'era lock → ogni rebuild del Cloud pescava le ultime in autonomia. Aveva già rotto il venv locale (streamlit 1.56 + plotly 6.9: `go.layout.template.Data` rimosso in plotly 6.x → ImportError **al boot, prima del login**). Pinnati streamlit/plotly/pandas/numpy/scipy/openpyxl (+docxtpl/python-docx) a un set **verificato in venv pulito** (16 moduli chiave importano insieme). Supabase/transport restano floor `>=`.
+- **🟡 Missioni duplicate (`00724fc`)**: `_user_has_missions` ritornava `[]` su errore DB (es. 42501 da GRANT mancante) e `check_onboarding_needed` lo leggeva come "nessuna missione" → onboarding → l'utente creava un duplicato (root cause dei 3× "CubeSat Demo" a secondi di distanza del 19/06, prima della migration `20260619140000` di Matteo delle 14:00). Difesa in profondità: ora ritorna `None` su errore (≠ `[]`), e l'onboarding non parte su errore. ⚠️ **Da confermare**: che la migration `20260619140000` sia applicata al DB live.
+- **🟡 Reports DOCX (`936f18b`)**: `docxtpl`/`python-docx` usati da `reports.py` ma assenti da `requirements.txt` → "docxtpl not installed" sul Cloud. Dichiarati. **PDF (non risolto, deliberato)**: usa `pdflatex` (binario TeX Live assente sul Cloud, manca `packages.txt`) → il toggle PDF fallirà; deciso di lasciarlo al locale (il DOCX copre la ESA compliance). Nota minore: `gotrue` deprecato → `supabase_auth` (futuro).
+
 ---
 
 ## Roadmap Futuro
