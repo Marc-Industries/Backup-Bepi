@@ -49,6 +49,7 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 - ✅ Integrazioni: GMAT/FreeFlyer/MATLAB scripts, 3D orbit viz, thermal/power models, LCA, SPICE kernels, space environment (radiation/debris)
 - ✅ Warehouse management per procurement
 - ✅ Team management con inviti email (Supabase Edge Functions + Resend)
+- ✅ **Operating modes per equipment power**: ogni equipment ha UN power per mode (Commissioning, Recovery, Operation, …). Tabella `operating_modes` mission-scoped, hard cap 10 mode, gestita da Settings (add / delete / rename). Budget Editor mostra matrice power per equipment × mode via expander. Schema in `supabase/migrations/20260717170000_power_budget_operating_modes.sql`.
 
 ### Next.js Frontend (ARCHIVIATO 2026-06-10)
 > Codice storico sul branch `archive/nextjs-frontend` (non più mantenuto, rimosso da `main`). Runtime attuale: solo Streamlit. (`git checkout archive/nextjs-frontend` per recuperarlo se serve solo lettura.)
@@ -147,6 +148,9 @@ supabase functions deploy send-invitation
 - `tasks`: WBS tasks con CPM
 - `product_tree_nodes`: Hierarchical product tree
 - `equip_budgets`: Equipment mass/power budgets
+- `operating_modes`: Operating mode definitions per mission (Commissioning, Recovery, Operation, …) — usata da `budgets.operating_mode_id` per memorizzare un power per equipment × mode
+- `budgets`: Mass (mode-independent, `operating_mode_id IS NULL`) + Power (per mode, `operating_mode_id` non-null). Vincolo UNIQUE su `(node_id, budget_type, operating_mode_id)`.
+- `budget_limits`: Power limit per missione e per mode
 - `approval_log`: Change approval workflow
 - `email_queue`: Email sending queue
 - `team_members`: User roles per mission
@@ -224,6 +228,14 @@ Verifica di sistema approfondita (Opus 4.8) + fix del debito emerso, per gravit�
 - **🟠 Dipendenze non pinnate (`e5bf09e`)**: `requirements.txt` lasciava plotly/pandas/numpy/scipy senza versione e non c'era lock → ogni rebuild del Cloud pescava le ultime in autonomia. Aveva già rotto il venv locale (streamlit 1.56 + plotly 6.9: `go.layout.template.Data` rimosso in plotly 6.x → ImportError **al boot, prima del login**). Pinnati streamlit/plotly/pandas/numpy/scipy/openpyxl (+docxtpl/python-docx) a un set **verificato in venv pulito** (16 moduli chiave importano insieme). Supabase/transport restano floor `>=`.
 - **🟡 Missioni duplicate (`00724fc`)**: `_user_has_missions` ritornava `[]` su errore DB (es. 42501 da GRANT mancante) e `check_onboarding_needed` lo leggeva come "nessuna missione" → onboarding → l'utente creava un duplicato (root cause dei 3× "CubeSat Demo" a secondi di distanza del 19/06, prima della migration `20260619140000` di Matteo delle 14:00). Difesa in profondità: ora ritorna `None` su errore (≠ `[]`), e l'onboarding non parte su errore. ⚠️ **Da confermare**: che la migration `20260619140000` sia applicata al DB live.
 - **🟡 Reports DOCX (`936f18b`)**: `docxtpl`/`python-docx` usati da `reports.py` ma assenti da `requirements.txt` → "docxtpl not installed" sul Cloud. Dichiarati. **PDF (non risolto, deliberato)**: usa `pdflatex` (binario TeX Live assente sul Cloud, manca `packages.txt`) → il toggle PDF fallirà; deciso di lasciarlo al locale (il DOCX copre la ESA compliance). Nota minore: `gotrue` deprecato → `supabase_auth` (futuro).
+
+## Operating Modes Feature (2026-07-17)
+
+- **Power per equipment × mode**: ogni equipment ha un `nominal_value` di power diverso per ogni `operating_mode` (Commissioning, Recovery, Operation, …). Schema: `budgets.operating_mode_id` + UNIQUE `(node_id, budget_type, operating_mode_id)`. Mass resta mode-independent (1 riga con `operating_mode_id IS NULL`).
+- **Settings → Operating Modes**: editor con Add (riga vuota in fondo), Delete (colonna 🗑️), Rename, Default flag. Hard cap 10 mode per missione (`MAX_OPERATING_MODES_PER_MISSION` in `streamlit_app.py`); contatore `N/10` visibile. Cache `operating_modes` e `equip_budgets` invalidata dopo save.
+- **Budget → Edit Equipment**: la tabella ha SOLO colonne non-power (Subsystem, Code, Name, Mass, Qty, Maturity). Il power è in un expander per ogni equipment, con N `number_input` (uno per mode). Save batch persiste N righe in `budgets`.
+- **RLS**: INSERT/UPDATE/SELECT su `operating_modes` permesso a qualsiasi membro della missione (`is_mission_member`). DELETE solo a PM/SE (`has_mission_role(..., ARRAY['PM','SE'])`). Migration: `supabase/migrations/20260717170000_power_budget_operating_modes.sql`.
+- **Power limit per mode**: out of scope (vedi `OPERATING_MODES_FEATURE.md` §6). Per ora il `power_limit` è scritto solo per il default mode.
 
 ---
 

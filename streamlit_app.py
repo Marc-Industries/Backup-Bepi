@@ -686,6 +686,11 @@ DEFAULT_OPERATING_MODES = [
     {"name": "Operation", "description": "Nominal mission operations"},
 ]
 
+# Hard cap on operating modes per mission. Each equipment's power budget is
+# stored as one row per (node, mode) in `budgets`, so the cap keeps the
+# Edit Equipment matrix (and the budgets table) from growing without bound.
+MAX_OPERATING_MODES_PER_MISSION = 10
+
 
 def _get_operating_modes():
     """Return mission modes, creating sensible local defaults when needed."""
@@ -1104,32 +1109,167 @@ if st.session_state.get("show_settings", False):
             _load_mission(sel_mid)
             st.rerun()
 
-        st.markdown("#### Operating Modes")
-        st.caption("Configure the names used by the power budget and the Product Tree equipment inputs.")
-        settings_modes = _get_operating_modes()
-        mode_df = pd.DataFrame([{"Name": mode["name"], "Description": mode.get("description", ""), "Default": mode.get("is_default", False)} for mode in settings_modes])
-        edited_modes = st.data_editor(mode_df, key="_settings_operating_modes", hide_index=True, width="stretch",
-            column_config={"Name": st.column_config.TextColumn(required=True), "Description": st.column_config.TextColumn(), "Default": st.column_config.CheckboxColumn()})
-        if st.button("Save operating modes", key="_save_operating_modes", disabled=not can("edit_budget")):
-            if edited_modes["Name"].str.strip().eq("").any() or edited_modes["Name"].str.lower().duplicated().any():
-                st.error("Each operating mode needs a unique name.")
-            elif int(edited_modes["Default"].sum()) != 1:
+        st.markdown(f"#### Operating Modes ({len(settings_modes)}/{MAX_OPERATING_MODES_PER_MISSION})")
+        st.caption("Configure the names used by the power budget and the Product Tree equipment inputs. Add rows to create a new mode; tick the 🗑️ column to delete an existing one.")
+        # One row per existing mode + one empty row at the bottom for "Add new"
+        # (only when below the cap).
+        mode_df_rows = [
+            {
+                "Name": m["name"],
+                "Description": m.get("description", ""),
+                "Default": bool(m.get("is_default", False)),
+                "_delete": False,
+            }
+            for m in settings_modes
+        ]
+        if len(settings_modes) < MAX_OPERATING_MODES_PER_MISSION:
+            mode_df_rows.append({"Name": "", "Description": "", "Default": False, "_delete": False})
+        mode_df = pd.DataFrame(mode_df_rows)
+
+        # Block the Delete column when only one mode remains, to keep the
+        # `_get_default_operating_mode()` invariant intact.
+        disable_delete_col = len(settings_modes) < 2
+
+        edited_modes = st.data_editor(
+            mode_df, key="_settings_operating_modes", hide_index=True, width="stretch",
+            column_config={
+                "Name": st.column_config.TextColumn(required=False),
+                "Description": st.column_config.TextColumn(),
+                "Default": st.column_config.CheckboxColumn(),
+                "_delete": st.column_config.CheckboxColumn(
+                    label="🗑️", help="Tick to delete this mode on save",
+                    disabled=disable_delete_col,
+                ),
+            },
+        )
+
+        csave, creset = st.columns([1, 1])
+        with csave:
+            save_modes_clicked = st.button(
+                "Save operating modes", key="_save_operating_modes",
+                disabled=not can("edit_budget"),
+            )
+        with creset:
+            if st.button("Reset", key="_reset_operating_modes"):
+                st.session_state.pop("operating_modes", None)
+                st.session_state.pop("equip_budgets", None)
+                st.rerun()
+
+        if save_modes_clicked:
+            # --- Client-side validation -------------------------------------
+            valid_names = edited_modes["Name"].astype(str).str.strip()
+            # At most one empty row (the "new mode" slot).
+            empty_rows = (valid_names == "").sum()
+            if empty_rows > 1:
+                st.error("Only one new mode can be added at a time. Fill the empty row or remove it.")
+                st.stop()
+            # When a row is marked for delete its name doesn't count.
+            keep_mask = ~edited_modes["_delete"].fillna(False).astype(bool)
+            kept_names = valid_names[keep_mask]
+            kept_default = edited_modes["Default"][keep_mask]
+            if (kept_names == "").any():
+                st.error("Each kept operating mode needs a name (or tick its 🗑️ column).")
+                st.stop()
+            if kept_names.str.lower().duplicated(keep=False).any():
+                st.error("Each operating mode needs a unique name (case-insensitive).")
+                st.stop()
+            if int(kept_default.sum()) != 1:
                 st.error("Select exactly one default operating mode.")
-            else:
-                try:
-                    client = get_supabase()
-                    if client:
-                        client.table("operating_modes").update({"is_default": False}).eq("mission_id", st.session_state.get("active_mission_id")).execute()
-                    for index, row in edited_modes.iterrows():
-                        mode = settings_modes[index]
-                        payload = {"name": row["Name"].strip(), "description": row["Description"], "is_default": bool(row["Default"])}
-                        if client and not str(mode["id"]).startswith("local-"):
-                            client.table("operating_modes").update(payload).eq("id", mode["id"]).execute()
-                        mode.update(payload)
-                    st.success("Operating modes saved.")
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Unable to save operating modes: {exc}")
+                st.stop()
+            new_after_save = (
+                len(settings_modes)  # existing
+                - int(edited_modes["_delete"].sum())  # deleted
+                + (1 if empty_rows == 0 and len(settings_modes) < MAX_OPERATING_MODES_PER_MISSION else 0)
+            )
+            if new_after_save > MAX_OPERATING_MODES_PER_MISSION:
+                st.error(f"Hard cap: {MAX_OPERATING_MODES_PER_MISSION} operating modes per mission.")
+                st.stop()
+            if new_after_save < 1:
+                st.error("At least one operating mode must remain.")
+                st.stop()
+
+            # --- Persist ---------------------------------------------------
+            try:
+                client = get_supabase()
+                mission_id = st.session_state.get("active_mission_id")
+
+                # Pre-flight: make sure the default flag is unique across the
+                # mission. The DB enforces a UNIQUE INDEX WHERE is_default, so
+                # we must clear it on the previously-default row before
+                # promoting another one.
+                new_default_id = None
+                if int(kept_default.sum()) == 1:
+                    new_default_name = kept_names[kept_default].iloc[0]
+                    if new_default_name in {m["name"] for m in settings_modes}:
+                        new_default_id = next(
+                            m["id"] for m in settings_modes if m["name"] == new_default_name
+                        )
+
+                for index, row in edited_modes.iterrows():
+                    is_new_row = index >= len(settings_modes)
+                    is_marked_delete = bool(row["_delete"])
+                    existing = settings_modes[index] if not is_new_row else None
+
+                    if is_marked_delete and existing and not existing.get("is_default"):
+                        if client and not str(existing["id"]).startswith("local-"):
+                            # RLS: only PM/SE may DELETE operating_modes.
+                            # Members get 42501 here; we surface a clear msg.
+                            try:
+                                client.table("operating_modes").delete().eq(
+                                    "id", existing["id"]
+                                ).execute()
+                            except Exception as delete_exc:
+                                st.error(
+                                    f"Cannot delete mode '{existing['name']}': "
+                                    "only PM/SE may remove operating modes "
+                                    "(RLS policy on operating_modes)."
+                                )
+                                raise
+                        continue
+
+                    if is_new_row:
+                        if not row["Name"].strip():
+                            continue  # empty placeholder row
+                        if client and mission_id:
+                            payload = {
+                                "mission_id": mission_id,
+                                "name": row["Name"].strip(),
+                                "description": row["Description"],
+                                "is_default": bool(row["Default"]),
+                            }
+                            if payload["is_default"]:
+                                client.table("operating_modes").update(
+                                    {"is_default": False}
+                                ).eq("mission_id", mission_id).execute()
+                            client.table("operating_modes").insert(payload).execute()
+                        continue
+
+                    # UPDATE existing
+                    if existing:
+                        payload = {
+                            "name": row["Name"].strip(),
+                            "description": row["Description"],
+                            "is_default": bool(row["Default"]),
+                        }
+                        if payload["is_default"]:
+                            client.table("operating_modes").update(
+                                {"is_default": False}
+                            ).eq("mission_id", existing["mission_id"]).neq(
+                                "id", existing["id"]
+                            ).execute()
+                        if client and not str(existing["id"]).startswith("local-"):
+                            client.table("operating_modes").update(payload).eq(
+                                "id", existing["id"]
+                            ).execute()
+                        existing.update(payload)
+
+                st.success("Operating modes saved.")
+                # Force re-load on next render.
+                st.session_state.pop("operating_modes", None)
+                st.session_state.pop("equip_budgets", None)
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Unable to save operating modes: {exc}")
         
         # Manage all missions button
         if "show_manage_missions" not in st.session_state:
@@ -2918,20 +3058,26 @@ def page_budgets():
 
     with tab_equip_edit:
         st.markdown("##### Equipment Budget Editor")
+        st.caption(
+            "Mass, qty, maturity are shared across operating modes. Power is "
+            "per mode — open each equipment's expander to set it."
+        )
         eb = _get_equip_budgets()
         flat = _get_product_tree()
         equip_nodes = [n for n in flat if n["level"] == "equipment"]
         if equip_nodes:
+            # ----- Top table: non-power fields ----------------------------
             eq_rows = []
             for n in equip_nodes:
                 b = eb.get(n["code"], {"mass": 0.0, "power": 0, "qty": 1, "mat": "estimate", "trl": 5})
                 parent = next((p for p in flat if p["id"] == n.get("parent_id")), None)
                 eq_rows.append({
                     "Subsystem": parent["code"] if parent else "—",
-                    "Code": n["code"], "Name": n["name"],
+                    "Code": n["code"],
+                    "Name": n["name"],
                     "Mass (kg)": b.get("mass", 0.0),
-                    f"Power — {selected_mode['name']} (W)": b.get("power_by_mode", {}).get(str(selected_mode["id"]), b.get("power", 0) if selected_mode.get("is_default") else 0.0),
-                    "Qty": b.get("qty", 1), "Maturity": b.get("mat", "estimate"),
+                    "Qty": b.get("qty", 1),
+                    "Maturity": b.get("mat", "estimate"),
                 })
             eq_df = pd.DataFrame(eq_rows)
             if can("edit_budget"):
@@ -2942,66 +3088,146 @@ def page_budgets():
                         "Code": st.column_config.TextColumn(disabled=True),
                         "Name": st.column_config.TextColumn(),
                         "Mass (kg)": st.column_config.NumberColumn(min_value=0.0, step=0.1, format="%.2f"),
-                        f"Power — {selected_mode['name']} (W)": st.column_config.NumberColumn(min_value=0, step=0.5, format="%.1f"),
                         "Qty": st.column_config.NumberColumn(min_value=1, step=1),
-                        "Maturity": st.column_config.SelectboxColumn(options=["estimate", "measured", "qualified"]),
+                        "Maturity": st.column_config.SelectboxColumn(
+                            options=["estimate", "measured", "qualified"]
+                        ),
                     },
                 )
             else:
-                edited_eq = eq_df
                 st.dataframe(eq_df, hide_index=True, width="stretch")
                 st.caption("🔒 Read-only — `edit_budget` permission required")
-            if st.button("Save & Recalculate", key="_bud_equip_save", type="primary", disabled=not can("edit_budget")):
+                edited_eq = eq_df  # for the read-only path we don't actually write
+
+            # ----- Per-equipment, per-mode power inputs -------------------
+            st.markdown("##### Power (W) per equipment and operating mode")
+            equipment_modes = _get_operating_modes()
+            power_inputs: dict[tuple[str, str], float] = {}
+            for n in equip_nodes:
+                code = n["code"]
+                b = eb.get(code, {})
+                pwr_by_mode = b.get("power_by_mode", {})
+                label = f"⚡ {code} — {n['name']}"
+                with st.expander(label, expanded=False):
+                    cols = st.columns(min(3, max(1, len(equipment_modes))))
+                    for i, mode in enumerate(equipment_modes):
+                        with cols[i % len(cols)]:
+                            mid = str(mode["id"])
+                            key = f"_bud_power_{code}_{mid}"
+                            power_inputs[(code, mid)] = st.number_input(
+                                f"{mode['name']} (W)",
+                                min_value=0.0,
+                                value=float(pwr_by_mode.get(mid, 0.0)),
+                                step=0.5,
+                                key=key,
+                                disabled=not can("edit_budget"),
+                                format="%.1f",
+                            )
+
+            if st.button(
+                "Save & Recalculate", key="_bud_equip_save", type="primary",
+                disabled=not can("edit_budget"),
+            ):
                 client = get_supabase()
                 mission_id = st.session_state.get("active_mission_id")
-                
+                default_mode = _default_operating_mode()
                 try:
                     for _, row in edited_eq.iterrows():
                         code = row["Code"]
                         mass_kg = float(row["Mass (kg)"])
-                        power_w = float(row[f"Power — {selected_mode['name']} (W)"])
                         qty = int(row["Qty"])
                         mat = row["Maturity"]
-                        
-                        # Update session_state
+                        node = next((n for n in equip_nodes if n["code"] == code), None)
+                        if not node:
+                            continue
+                        node_id = node.get("id")  # UUID
+                        if not node_id:
+                            continue
+
+                        # Update name if changed
+                        if node["name"] != row["Name"]:
+                            if client:
+                                client.table("product_tree_nodes").update(
+                                    {"name": row["Name"]}
+                                ).eq("id", node_id).execute()
+                            node["name"] = row["Name"]
+
+                        # Mass is mode-independent: one row with operating_mode_id NULL.
+                        if client:
+                            res = client.table("budgets").update({
+                                "nominal_value": mass_kg, "quantity": qty,
+                                "maturity": mat, "source": "equipment_editor",
+                            }).eq("node_id", node_id).eq("budget_type", "mass_kg").is_(
+                                "operating_mode_id", "null"
+                            ).execute()
+                            if not res.data:
+                                client.table("budgets").insert({
+                                    "node_id": node_id, "budget_type": "mass_kg",
+                                    "nominal_value": mass_kg, "unit": "kg",
+                                    "quantity": qty, "maturity": mat, "margin_pct": 0,
+                                    "source": "equipment_editor",
+                                }).execute()
+
+                        # Power: one row per mode.
+                        power_by_mode: dict[str, float] = {}
+                        if client:
+                            for mode in equipment_modes:
+                                mid = str(mode["id"])
+                                power_w = float(power_inputs.get((code, mid), 0.0))
+                                power_by_mode[mid] = power_w
+                                res = client.table("budgets").update({
+                                    "nominal_value": power_w, "quantity": qty,
+                                    "maturity": mat, "source": "equipment_editor",
+                                }).eq("node_id", node_id).eq(
+                                    "budget_type", "power_w"
+                                ).eq("operating_mode_id", mid).execute()
+                                if not res.data:
+                                    client.table("budgets").insert({
+                                        "node_id": node_id, "budget_type": "power_w",
+                                        "operating_mode_id": mid,
+                                        "nominal_value": power_w, "unit": "W",
+                                        "quantity": qty, "maturity": mat,
+                                        "margin_pct": 0, "source": "equipment_editor",
+                                    }).execute()
+
+                        # Update session_state cache for this equipment.
                         eb[code] = {
                             "mass": mass_kg,
-                            "power": power_w if selected_mode.get("is_default") else eb.get(code, {}).get("power", 0.0),
-                            "power_by_mode": {**eb.get(code, {}).get("power_by_mode", {}), str(selected_mode["id"]): power_w},
+                            "power": power_by_mode.get(str(default_mode["id"]), 0.0),
+                            "power_by_mode": power_by_mode,
                             "qty": qty, "mat": mat,
                             "trl": eb.get(code, {}).get("trl", 5),
                         }
-                        
-                        # Find node by code and update name if changed
-                        node = next((n for n in equip_nodes if n["code"] == code), None)
-                        if node and node["name"] != row["Name"]:
-                            node["name"] = row["Name"]
-                        
-                        # Persist to DB if client available.
-                        # Update existing budget rows, insert only when none exist.
-                        # NOTE: do NOT use .upsert() here — the budgets table has no
-                        # UNIQUE(node_id, budget_type) constraint, so upsert resolves
-                        # on the PK (id) and inserts a brand-new row every save,
-                        # accumulating duplicates.
-                        if client and node:
-                            node_id = node.get("id")  # UUID
-                            if node_id:
-                                res = client.table("budgets").update({"nominal_value": mass_kg, "quantity": qty, "maturity": mat, "source": "equipment_editor"}).eq("node_id", node_id).eq("budget_type", "mass_kg").is_("operating_mode_id", "null").execute()
-                                if not res.data:
-                                    client.table("budgets").insert({"node_id": node_id, "budget_type": "mass_kg", "nominal_value": mass_kg, "unit": "kg", "quantity": qty, "maturity": mat, "margin_pct": 0, "source": "equipment_editor"}).execute()
-                                res = client.table("budgets").update({"nominal_value": power_w, "quantity": qty, "maturity": mat, "source": "equipment_editor"}).eq("node_id", node_id).eq("budget_type", "power_w").eq("operating_mode_id", selected_mode["id"]).execute()
-                                if not res.data:
-                                    client.table("budgets").insert({"node_id": node_id, "budget_type": "power_w", "operating_mode_id": selected_mode["id"], "nominal_value": power_w, "unit": "W", "quantity": qty, "maturity": mat, "margin_pct": 0, "source": "equipment_editor"}).execute()
-                    
+
+                    # Power limit: write for the *default* mode (the only one
+                    # the rollup currently selects; per-mode limits are out of
+                    # scope — see OPERATING_MODES_FEATURE.md §6).
                     if client and mission_id:
-                        limit_res = client.table("budget_limits").update({"limit_value": power_limit, "unit": "W"}).eq("mission_id", mission_id).eq("budget_type", "power_w").eq("operating_mode_id", selected_mode["id"]).execute()
+                        limit_res = client.table("budget_limits").update({
+                            "limit_value": power_limit, "unit": "W",
+                        }).eq("mission_id", mission_id).eq(
+                            "budget_type", "power_w"
+                        ).eq("operating_mode_id", default_mode["id"]).execute()
                         if not limit_res.data:
-                            client.table("budget_limits").insert({"mission_id": mission_id, "budget_type": "power_w", "operating_mode_id": selected_mode["id"], "limit_value": power_limit, "unit": "W"}).execute()
-                    st.session_state["budget_limits"] = [row for row in st.session_state.get("budget_limits", []) if not (row.get("budget_type") == "power_w" and str(row.get("operating_mode_id")) == str(selected_mode["id"]))] + [{"budget_type": "power_w", "operating_mode_id": selected_mode["id"], "limit_value": power_limit, "unit": "W"}]
+                            client.table("budget_limits").insert({
+                                "mission_id": mission_id, "budget_type": "power_w",
+                                "operating_mode_id": default_mode["id"],
+                                "limit_value": power_limit, "unit": "W",
+                            }).execute()
+                        st.session_state["budget_limits"] = [
+                            row for row in st.session_state.get("budget_limits", [])
+                            if not (row.get("budget_type") == "power_w"
+                                    and str(row.get("operating_mode_id"))
+                                    == str(default_mode["id"]))
+                        ] + [{
+                            "budget_type": "power_w",
+                            "operating_mode_id": default_mode["id"],
+                            "limit_value": power_limit, "unit": "W",
+                        }]
                     st.success("✅ Budget saved to database!")
                 except Exception as e:
                     st.error(f"❌ Error saving budget: {e}")
-                
+
                 st.rerun()
         else:
             st.info("No equipment nodes in the product tree.")
