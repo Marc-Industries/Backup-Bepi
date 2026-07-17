@@ -105,13 +105,14 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                         # Add budgets for equipment
                         if data.get("level") == "equipment":
                             node_uuid = new_uuid
-                            eb[data["code"]] = {"mass": 0.0, "power": 0, "qty": 1, "mat": "estimate", "trl": 1}
+                            default_mode = _default_operating_mode()
+                            eb[data["code"]] = {"mass": 0.0, "power": 0, "power_by_mode": {str(default_mode["id"]): 0.0}, "qty": 1, "mat": "estimate", "trl": 1}
                             try:
                                 client.table("budgets").insert({
                                     "node_id": node_uuid, "budget_type": "mass_kg", "nominal_value": 0.0, "unit": "kg", "maturity": "estimate"
                                 }).execute()
                                 client.table("budgets").insert({
-                                    "node_id": node_uuid, "budget_type": "power_w", "nominal_value": 0.0, "unit": "W", "maturity": "estimate"
+                                    "node_id": node_uuid, "budget_type": "power_w", "operating_mode_id": default_mode["id"], "nominal_value": 0.0, "unit": "W", "maturity": "estimate"
                                 }).execute()
                             except Exception as e:
                                 st.warning(f"Budget row insert failed: {e}")
@@ -128,6 +129,8 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
             if code:
                 eb[code]["mass"] = float(data.get("mass", eb.get(code, {}).get("mass", 0)))
                 eb[code]["power"] = float(data.get("power", eb.get(code, {}).get("power", 0)))
+                default_mode = _default_operating_mode()
+                eb[code].setdefault("power_by_mode", {})[str(default_mode["id"])] = eb[code]["power"]
                 eb[code]["qty"] = int(data.get("qty", eb.get(code, {}).get("qty", 1)))
                 eb[code]["mat"] = data.get("maturity", eb.get(code, {}).get("mat", "estimate"))
                 eb[code]["trl"] = int(data.get("trl", eb.get(code, {}).get("trl", 1)))
@@ -138,7 +141,7 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                             if n.get("code") == code:
                                 node_uuid = n.get("uuid") or n.get("id")
                                 if node_uuid:
-                                    for btype, field, unit in [("mass_kg", "mass", "kg"), ("power_w", "power", "W")]:
+                                    for btype, field, unit in [("mass_kg", "mass", "kg")]:
                                         res = client.table("budgets").update({
                                             "nominal_value": eb[code][field],
                                             "maturity": eb[code]["mat"],
@@ -151,6 +154,9 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                                                 "unit": unit,
                                                 "maturity": eb[code]["mat"],
                                             }).execute()
+                                    res = client.table("budgets").update({"nominal_value": eb[code]["power"], "maturity": eb[code]["mat"]}).eq("node_id", node_uuid).eq("budget_type", "power_w").eq("operating_mode_id", default_mode["id"]).execute()
+                                    if not res.data:
+                                        client.table("budgets").insert({"node_id": node_uuid, "budget_type": "power_w", "operating_mode_id": default_mode["id"], "nominal_value": eb[code]["power"], "unit": "W", "maturity": eb[code]["mat"]}).execute()
                                 break
                     except Exception as e:
                         st.error(f"Update Error: {e}")
@@ -296,6 +302,7 @@ def get_latest_approval(entity, entity_id):
 _MISSION_DATA_KEYS = [
     "tasks", "requirements", "risks", "approval_log", "req_ownership",
     "task_assignments", "risk_overrides", "product_tree", "equip_budgets",
+    "operating_modes", "budget_limits",
     "warehouse_items", "procurement_orders", "mission_phase", "mission_framework",
     "orb_alt", "orb_inc", "orb_ecc", "orb_raan", "orb_aop", "orb_mass", "orb_area", "orb_epoch",
     "team_members", "fmeca_entries", "propellant_kg",
@@ -638,31 +645,90 @@ def _get_equip_budgets():
                         code = node.get("code", "")
                         node_id = node.get("id")
                         
-                        # Get mass and power budgets for this node
-                        budgets_result = client.table("budgets").select("budget_type, nominal_value").eq("node_id", node_id).execute()
+                        # Power is stored once for every operating mode.
+                        budgets_result = client.table("budgets").select("budget_type, nominal_value, operating_mode_id, quantity, maturity").eq("node_id", node_id).execute()
                         
                         mass_val = 0.0
-                        power_val = 0
+                        power_by_mode = {}
+                        quantity = 1
+                        maturity = "estimate"
                         
                         if budgets_result.data:
                             for b in budgets_result.data:
                                 if b.get("budget_type") == "mass_kg":
                                     mass_val = float(b.get("nominal_value", 0))
                                 elif b.get("budget_type") == "power_w":
-                                    power_val = float(b.get("nominal_value", 0))
+                                    mode_id = b.get("operating_mode_id")
+                                    if mode_id:
+                                        power_by_mode[str(mode_id)] = float(b.get("nominal_value", 0))
+                                quantity = int(b.get("quantity") or quantity)
+                                maturity = b.get("maturity") or maturity
                         
                         if code:
                             st.session_state["equip_budgets"][code] = {
                                 "mass": mass_val,
-                                "power": power_val,
-                                "qty": 1,
-                                "mat": "estimate",
+                                # ``power`` is kept for legacy product-tree widgets.
+                                "power": next(iter(power_by_mode.values()), 0.0),
+                                "power_by_mode": power_by_mode,
+                                "qty": quantity,
+                                "mat": maturity,
                                 "trl": 1
                             }
             except Exception as e:
                 st.error(f"Caricamento budget dal DB fallito: {e}")
     
     return st.session_state["equip_budgets"]
+
+
+DEFAULT_OPERATING_MODES = [
+    {"name": "Commissioning", "description": "Initial checkout and commissioning"},
+    {"name": "Recovery", "description": "Safe/recovery operations"},
+    {"name": "Operation", "description": "Nominal mission operations"},
+]
+
+
+def _get_operating_modes():
+    """Return mission modes, creating sensible local defaults when needed."""
+    modes = st.session_state.get("operating_modes")
+    if modes:
+        return modes
+
+    mission_id = st.session_state.get("active_mission_id")
+    client = get_supabase()
+    modes = []
+    if client and mission_id:
+        try:
+            modes = (client.table("operating_modes").select("*")
+                     .eq("mission_id", mission_id).order("created_at").execute().data or [])
+            if not modes:
+                payload = [
+                    {"mission_id": mission_id, **mode, "is_default": mode["name"] == "Operation"}
+                    for mode in DEFAULT_OPERATING_MODES
+                ]
+                modes = client.table("operating_modes").insert(payload).execute().data or []
+        except Exception as exc:
+            st.warning(f"Unable to load operating modes: {exc}")
+
+    if not modes:
+        modes = [
+            {"id": f"local-{mode['name'].lower()}", **mode,
+             "is_default": mode["name"] == "Operation"}
+            for mode in DEFAULT_OPERATING_MODES
+        ]
+    st.session_state["operating_modes"] = modes
+    return modes
+
+
+def _default_operating_mode():
+    modes = _get_operating_modes()
+    return next((mode for mode in modes if mode.get("is_default")), modes[0])
+
+
+def _power_limit_for_mode(mode_id, fallback: float) -> float:
+    for row in st.session_state.get("budget_limits", []):
+        if row.get("budget_type") == "power_w" and str(row.get("operating_mode_id")) == str(mode_id):
+            return float(row.get("limit_value", fallback))
+    return fallback
 
 
 # --- Process product tree actions from the URL (legacy path, kept for
@@ -716,12 +782,19 @@ def _build_budget_tree():
                     nominal_value=b["mass"], quantity=b["qty"],
                     maturity=b["mat"], margin_pct=0,
                 ))
-                allocs.append(BudgetAllocationData(
-                    node_id=nid, node_code=n["code"], node_name=n["name"],
-                    budget_type="power_w", operating_mode="nominal",
-                    nominal_value=b["power"], quantity=b["qty"],
-                    maturity=b["mat"], margin_pct=0,
-                ))
+                power_by_mode = b.get("power_by_mode", {})
+                if not power_by_mode:
+                    # Backward-compatible local data has a single power value.
+                    power_by_mode = {str(_default_operating_mode()["id"]): b.get("power", 0.0)}
+                allocs.extend(
+                    BudgetAllocationData(
+                        node_id=nid, node_code=n["code"], node_name=n["name"],
+                        budget_type="power_w", operating_mode=str(mode_id),
+                        nominal_value=float(power), quantity=b["qty"],
+                        maturity=b["mat"], margin_pct=0,
+                    )
+                    for mode_id, power in power_by_mode.items()
+                )
         return {
             "node": {"code": n["code"], "name": n["name"], "level": n["level"], "quantity": n.get("quantity", 1)},
             "allocations": allocs,
@@ -1030,6 +1103,33 @@ if st.session_state.get("show_settings", False):
             _save_current_mission()
             _load_mission(sel_mid)
             st.rerun()
+
+        st.markdown("#### Operating Modes")
+        st.caption("Configure the names used by the power budget and the Product Tree equipment inputs.")
+        settings_modes = _get_operating_modes()
+        mode_df = pd.DataFrame([{"Name": mode["name"], "Description": mode.get("description", ""), "Default": mode.get("is_default", False)} for mode in settings_modes])
+        edited_modes = st.data_editor(mode_df, key="_settings_operating_modes", hide_index=True, width="stretch",
+            column_config={"Name": st.column_config.TextColumn(required=True), "Description": st.column_config.TextColumn(), "Default": st.column_config.CheckboxColumn()})
+        if st.button("Save operating modes", key="_save_operating_modes", disabled=not can("edit_budget")):
+            if edited_modes["Name"].str.strip().eq("").any() or edited_modes["Name"].str.lower().duplicated().any():
+                st.error("Each operating mode needs a unique name.")
+            elif int(edited_modes["Default"].sum()) != 1:
+                st.error("Select exactly one default operating mode.")
+            else:
+                try:
+                    client = get_supabase()
+                    if client:
+                        client.table("operating_modes").update({"is_default": False}).eq("mission_id", st.session_state.get("active_mission_id")).execute()
+                    for index, row in edited_modes.iterrows():
+                        mode = settings_modes[index]
+                        payload = {"name": row["Name"].strip(), "description": row["Description"], "is_default": bool(row["Default"])}
+                        if client and not str(mode["id"]).startswith("local-"):
+                            client.table("operating_modes").update(payload).eq("id", mode["id"]).execute()
+                        mode.update(payload)
+                    st.success("Operating modes saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Unable to save operating modes: {exc}")
         
         # Manage all missions button
         if "show_manage_missions" not in st.session_state:
@@ -1323,12 +1423,13 @@ def page_overview():
 
     _phase = st.session_state.get("mission_phase", "B2")
     _mass_limit = st.session_state.get("_bud_mass_limit", 350.0)
-    _power_limit = st.session_state.get("_bud_power_limit", 500.0)
+    _mode = _default_operating_mode()
+    _power_limit = _power_limit_for_mode(_mode["id"], st.session_state.get("_bud_power_limit", 500.0))
     
     _prop_kg = st.session_state.get("propellant_kg", 0.0)
     
     mass_summary = compute_budget_summary(_build_budget_tree(), _phase, "mass_kg", budget_limit=_mass_limit - _prop_kg)
-    power_summary = compute_budget_summary(_build_budget_tree(), _phase, "power_w", "nominal", budget_limit=_power_limit)
+    power_summary = compute_budget_summary(_build_budget_tree(), _phase, "power_w", str(_mode["id"]), budget_limit=_power_limit)
     wet_mass = mass_summary.total_with_system_margin + _prop_kg
     reqs = get_requirements()
     risks = get_effective_risks()  # applica override di stato/residual
@@ -1336,7 +1437,7 @@ def page_overview():
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Wet Mass", f"{wet_mass:.1f} kg", f"{_mass_limit - wet_mass:.1f} kg margin")
-    c2.metric("Total Power", f"{power_summary.total_with_system_margin:.1f} W", f"{power_summary.remaining:.1f} W margin")
+    c2.metric(f"Total Power ({_mode['name']})", f"{power_summary.total_with_system_margin:.1f} W", f"{power_summary.remaining:.1f} W margin")
     c3.metric("Requirements", len(reqs), f"{cov['overall_pct']:.0f}% verified")
     c4.metric("Open Risks", sum(1 for r in risks if r.status == "open"), f"{sum(1 for r in risks if r.risk_level in ('critical','high'))} high/critical")
     _fw_data = get_framework(st.session_state.get("mission_framework", "ESA"))
@@ -1396,13 +1497,13 @@ def page_overview():
         st.plotly_chart(fig, width="stretch")
 
     with col_c:
-        st.markdown("##### Power Budget")
+        st.markdown(f"##### Power Budget — {_mode['name']}")
         status_color_p = {"green": "#27ae60", "yellow": "#f39c12", "red": "#e74c3c"}
         color_p = status_color_p.get(power_summary.margin_status, "#27ae60")
         fig2 = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=power_summary.total_with_system_margin,
-            delta={"reference": 500, "decreasing": {"color": "#27ae60"}},
+            delta={"reference": _power_limit, "decreasing": {"color": "#27ae60"}},
             gauge={
                 "axis": {"range": [0, 600], "tickcolor": "#666"},
                 "bar": {"color": color_p},
@@ -1412,7 +1513,7 @@ def page_overview():
                     {"range": [400, 450], "color": "rgba(243,156,18,0.15)"},
                     {"range": [450, 600], "color": "rgba(231,76,60,0.15)"},
                 ],
-                "threshold": {"line": {"color": "#e74c3c", "width": 3}, "value": 500},
+                "threshold": {"line": {"color": "#e74c3c", "width": 3}, "value": _power_limit},
             },
             number={"suffix": " W", "font": {"size": 36}},
         ))
@@ -1508,6 +1609,17 @@ def _pt_render_add() -> None:
             help="Equipment-level only; stored in budgets table.",
         )
 
+    new_mode_powers = {}
+    if new_level == "equipment":
+        st.markdown("##### Power consumption by operating mode")
+        mode_columns = st.columns(min(3, len(_get_operating_modes())))
+        for index, mode in enumerate(_get_operating_modes()):
+            with mode_columns[index % len(mode_columns)]:
+                new_mode_powers[str(mode["id"])] = st.number_input(
+                    f"{mode['name']} (W)", min_value=0.0, value=0.0, step=0.5,
+                    key=f"_pt_new_power_{mode['id']}",
+                )
+
     st.divider()
     acol1, acol2 = st.columns([1, 1])
     with acol1:
@@ -1552,7 +1664,12 @@ def _pt_render_add() -> None:
             }
 
             try:
-                client.table("product_tree_nodes").insert(payload).execute()
+                created = client.table("product_tree_nodes").insert(payload).execute().data or []
+                if db_level == "equipment" and created:
+                    node_id = created[0]["id"]
+                    client.table("budgets").insert({"node_id": node_id, "budget_type": "mass_kg", "nominal_value": float(new_mass), "unit": "kg", "quantity": int(new_qty), "maturity": "estimate"}).execute()
+                    for mode_id, power_w in new_mode_powers.items():
+                        client.table("budgets").insert({"node_id": node_id, "budget_type": "power_w", "operating_mode_id": mode_id, "nominal_value": float(power_w), "unit": "W", "quantity": int(new_qty), "maturity": "estimate"}).execute()
                 st.session_state["_pt_just_added"] = {
                     "code": new_code.strip(), "name": new_name.strip(),
                     "level": db_level, "local_id": "",
@@ -1643,6 +1760,19 @@ def _pt_render_edit() -> None:
             help="Equipment-level only.",
         )
 
+    mode_powers = {}
+    if new_level == "equipment":
+        equipment_budget = _get_equip_budgets().get(node.get("code"), {})
+        st.markdown("##### Power consumption by operating mode")
+        mode_columns = st.columns(min(3, len(_get_operating_modes())))
+        for index, mode in enumerate(_get_operating_modes()):
+            with mode_columns[index % len(mode_columns)]:
+                mode_powers[str(mode["id"])] = st.number_input(
+                    f"{mode['name']} (W)", min_value=0.0,
+                    value=float(equipment_budget.get("power_by_mode", {}).get(str(mode["id"]), equipment_budget.get("power", 0.0) if mode.get("is_default") else 0.0)),
+                    step=0.5, key=f"_pt_edit_power_{target_id}_{mode['id']}",
+                )
+
     st.divider()
     acol1, acol2 = st.columns([1, 1])
     with acol1:
@@ -1675,6 +1805,23 @@ def _pt_render_edit() -> None:
                 client.table("product_tree_nodes").update(payload).eq(
                     "id", str(target_id)
                 ).execute()
+                if new_level == "equipment":
+                    budgets = _get_equip_budgets()
+                    default_mode = _default_operating_mode()
+                    budgets[new_code.strip()] = {
+                        "mass": float(new_mass),
+                        "power": mode_powers.get(str(default_mode["id"]), 0.0),
+                        "power_by_mode": mode_powers,
+                        "qty": int(new_qty), "mat": budgets.get(node.get("code"), {}).get("mat", "estimate"),
+                        "trl": int(new_trl),
+                    }
+                    mass_result = client.table("budgets").update({"nominal_value": float(new_mass), "quantity": int(new_qty)}).eq("node_id", str(target_id)).eq("budget_type", "mass_kg").is_("operating_mode_id", "null").execute()
+                    if not mass_result.data:
+                        client.table("budgets").insert({"node_id": str(target_id), "budget_type": "mass_kg", "nominal_value": float(new_mass), "unit": "kg", "quantity": int(new_qty), "maturity": "estimate"}).execute()
+                    for mode_id, power_w in mode_powers.items():
+                        power_result = client.table("budgets").update({"nominal_value": float(power_w), "quantity": int(new_qty)}).eq("node_id", str(target_id)).eq("budget_type", "power_w").eq("operating_mode_id", mode_id).execute()
+                        if not power_result.data:
+                            client.table("budgets").insert({"node_id": str(target_id), "budget_type": "power_w", "operating_mode_id": mode_id, "nominal_value": float(power_w), "unit": "W", "quantity": int(new_qty), "maturity": "estimate"}).execute()
                 st.session_state.pop("_pt_active", None)
                 st.session_state.pop("_pt_edit_target_id", None)
                 st.success(f"✅ Updated **{new_name}**.")
@@ -2699,6 +2846,7 @@ setView('tree');
 def page_budgets():
     phase = st.session_state.get("mission_phase", "B2")
     colored_header(label="Budget Dashboard", description=f"Mass & Power budgets with ECSS margins", color_name="green-70")
+    modes = _get_operating_modes()
 
     # Budget controls
     ctrl1, ctrl2, ctrl3 = st.columns([1, 1, 1])
@@ -2748,7 +2896,10 @@ def page_budgets():
     with ctrl2:
         mass_limit = st.number_input("Mass limit (kg, wet)", min_value=0.0, value=350.0, step=10.0, key="_bud_mass_limit")
     with ctrl3:
-        power_limit = st.number_input("Power limit (W)", min_value=0.0, value=500.0, step=10.0, key="_bud_power_limit")
+        selected_mode = st.selectbox("Power mode", modes, format_func=lambda m: m["name"], key="_bud_power_mode")
+        power_limit = st.number_input(f"Power limit — {selected_mode['name']} (W)", min_value=0.0,
+                                      value=_power_limit_for_mode(selected_mode["id"], 500.0), step=10.0,
+                                      key=f"_bud_power_limit_{selected_mode['id']}")
 
     tree = _build_budget_tree()
     _prop_kg = st.session_state.get("propellant_kg", 0.0)
@@ -2761,7 +2912,8 @@ def page_budgets():
         _render_budget(summary, "Mass (kg)", dry_limit, tree=tree)
 
     with tab_power:
-        summary = compute_budget_summary(tree, phase, "power_w", "nominal", budget_limit=power_limit)
+        st.caption(f"Power budget for **{selected_mode['name']}**")
+        summary = compute_budget_summary(tree, phase, "power_w", str(selected_mode["id"]), budget_limit=power_limit)
         _render_budget(summary, "Power (W)", power_limit, tree=tree)
 
     with tab_equip_edit:
@@ -2777,7 +2929,8 @@ def page_budgets():
                 eq_rows.append({
                     "Subsystem": parent["code"] if parent else "—",
                     "Code": n["code"], "Name": n["name"],
-                    "Mass (kg)": b.get("mass", 0.0), "Power (W)": b.get("power", 0),
+                    "Mass (kg)": b.get("mass", 0.0),
+                    f"Power — {selected_mode['name']} (W)": b.get("power_by_mode", {}).get(str(selected_mode["id"]), b.get("power", 0) if selected_mode.get("is_default") else 0.0),
                     "Qty": b.get("qty", 1), "Maturity": b.get("mat", "estimate"),
                 })
             eq_df = pd.DataFrame(eq_rows)
@@ -2789,7 +2942,7 @@ def page_budgets():
                         "Code": st.column_config.TextColumn(disabled=True),
                         "Name": st.column_config.TextColumn(),
                         "Mass (kg)": st.column_config.NumberColumn(min_value=0.0, step=0.1, format="%.2f"),
-                        "Power (W)": st.column_config.NumberColumn(min_value=0, step=0.5, format="%.1f"),
+                        f"Power — {selected_mode['name']} (W)": st.column_config.NumberColumn(min_value=0, step=0.5, format="%.1f"),
                         "Qty": st.column_config.NumberColumn(min_value=1, step=1),
                         "Maturity": st.column_config.SelectboxColumn(options=["estimate", "measured", "qualified"]),
                     },
@@ -2806,13 +2959,15 @@ def page_budgets():
                     for _, row in edited_eq.iterrows():
                         code = row["Code"]
                         mass_kg = float(row["Mass (kg)"])
-                        power_w = float(row["Power (W)"])
+                        power_w = float(row[f"Power — {selected_mode['name']} (W)"])
                         qty = int(row["Qty"])
                         mat = row["Maturity"]
                         
                         # Update session_state
                         eb[code] = {
-                            "mass": mass_kg, "power": power_w,
+                            "mass": mass_kg,
+                            "power": power_w if selected_mode.get("is_default") else eb.get(code, {}).get("power", 0.0),
+                            "power_by_mode": {**eb.get(code, {}).get("power_by_mode", {}), str(selected_mode["id"]): power_w},
                             "qty": qty, "mat": mat,
                             "trl": eb.get(code, {}).get("trl", 5),
                         }
@@ -2831,28 +2986,18 @@ def page_budgets():
                         if client and node:
                             node_id = node.get("id")  # UUID
                             if node_id:
-                                for btype, val, unit in [
-                                    ("mass_kg", mass_kg, "kg"),
-                                    ("power_w", power_w, "W"),
-                                ]:
-                                    res = client.table("budgets").update({
-                                        "nominal_value": val,
-                                        "quantity": qty,
-                                        "maturity": mat,
-                                        "source": "equipment_editor",
-                                    }).eq("node_id", node_id).eq("budget_type", btype).execute()
-                                    if not res.data:
-                                        client.table("budgets").insert({
-                                            "node_id": node_id,
-                                            "budget_type": btype,
-                                            "nominal_value": val,
-                                            "unit": unit,
-                                            "quantity": qty,
-                                            "maturity": mat,
-                                            "margin_pct": 0,
-                                            "source": "equipment_editor",
-                                        }).execute()
+                                res = client.table("budgets").update({"nominal_value": mass_kg, "quantity": qty, "maturity": mat, "source": "equipment_editor"}).eq("node_id", node_id).eq("budget_type", "mass_kg").is_("operating_mode_id", "null").execute()
+                                if not res.data:
+                                    client.table("budgets").insert({"node_id": node_id, "budget_type": "mass_kg", "nominal_value": mass_kg, "unit": "kg", "quantity": qty, "maturity": mat, "margin_pct": 0, "source": "equipment_editor"}).execute()
+                                res = client.table("budgets").update({"nominal_value": power_w, "quantity": qty, "maturity": mat, "source": "equipment_editor"}).eq("node_id", node_id).eq("budget_type", "power_w").eq("operating_mode_id", selected_mode["id"]).execute()
+                                if not res.data:
+                                    client.table("budgets").insert({"node_id": node_id, "budget_type": "power_w", "operating_mode_id": selected_mode["id"], "nominal_value": power_w, "unit": "W", "quantity": qty, "maturity": mat, "margin_pct": 0, "source": "equipment_editor"}).execute()
                     
+                    if client and mission_id:
+                        limit_res = client.table("budget_limits").update({"limit_value": power_limit, "unit": "W"}).eq("mission_id", mission_id).eq("budget_type", "power_w").eq("operating_mode_id", selected_mode["id"]).execute()
+                        if not limit_res.data:
+                            client.table("budget_limits").insert({"mission_id": mission_id, "budget_type": "power_w", "operating_mode_id": selected_mode["id"], "limit_value": power_limit, "unit": "W"}).execute()
+                    st.session_state["budget_limits"] = [row for row in st.session_state.get("budget_limits", []) if not (row.get("budget_type") == "power_w" and str(row.get("operating_mode_id")) == str(selected_mode["id"]))] + [{"budget_type": "power_w", "operating_mode_id": selected_mode["id"], "limit_value": power_limit, "unit": "W"}]
                     st.success("✅ Budget saved to database!")
                 except Exception as e:
                     st.error(f"❌ Error saving budget: {e}")

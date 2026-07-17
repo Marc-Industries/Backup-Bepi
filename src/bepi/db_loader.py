@@ -72,6 +72,7 @@ def load_mission_data(mission_id: str) -> dict:
     risks_result = client.table("risks").select("*").eq("mission_id", mission_id).execute()
     tasks_result = client.table("schedule_tasks").select("*").eq("mission_id", mission_id).execute()
     limits_result = client.table("budget_limits").select("*").eq("mission_id", mission_id).execute()
+    modes_result = client.table("operating_modes").select("*").eq("mission_id", mission_id).order("created_at").execute()
     members_result = load_mission_members(mission_id)
     mission_result = client.table("missions").select("*").eq("id", mission_id).execute()
 
@@ -86,13 +87,16 @@ def load_mission_data(mission_id: str) -> dict:
     for b in all_budgets:
         code = b.get("product_tree_nodes", {}).get("code", "") if isinstance(b.get("product_tree_nodes"), dict) else ""
         if code:
-            budgets_map[code] = {
-                "mass": b["nominal_value"] if b["budget_type"] == "mass_kg" else budgets_map.get(code, {}).get("mass", 0),
-                "power": b["nominal_value"] if b["budget_type"] == "power_w" else budgets_map.get(code, {}).get("power", 0),
-                "qty": 1,
-                "mat": b.get("maturity", "estimate"),
-                "trl": 6,
-            }
+            current = budgets_map.setdefault(code, {"mass": 0, "power": 0, "power_by_mode": {}, "qty": 1, "mat": "estimate", "trl": 6})
+            if b["budget_type"] == "mass_kg":
+                current["mass"] = b["nominal_value"]
+            elif b["budget_type"] == "power_w":
+                mode_id = b.get("operating_mode_id")
+                if mode_id:
+                    current["power_by_mode"][str(mode_id)] = b["nominal_value"]
+                current["power"] = b["nominal_value"]
+            current["qty"] = b.get("quantity") or current["qty"]
+            current["mat"] = b.get("maturity", current["mat"])
 
     node_id_map = {n.get("id"): n.get("code") for n in all_nodes if n.get("id")}
     node_ids = [nid for nid in node_id_map.keys()]
@@ -110,6 +114,7 @@ def load_mission_data(mission_id: str) -> dict:
         "tasks": [_map_task(t) for t in tasks_result.data or []],
         "team_members": [_map_member(m) for m in members_result],
         "budget_limits": [_map_budget_limit(l) for l in limits_result.data or []],
+        "operating_modes": modes_result.data or [],
         "equip_budgets": budgets_map,
         "fmeca_entries": [_map_fmeca_entry(f, node_id_map) for f in fmeca_rows],
         "mission_phase": mission.get("phase", "0"),
