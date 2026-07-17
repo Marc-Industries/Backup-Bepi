@@ -1,0 +1,1 @@
+{"nodes": [{"id": "setup-emails", "label": "Setup Email Invitations", "type": "doc", "description": "SETUP_EMAILS.md: setup Edge Function send-invitation con Resend (100 mail/gg free). NOTA: nel 2026-06-10 audit si \u00e8 passati a Brevo.", "source_file": "SETUP_EMAILS.md", "confidence": "EXTRACTED"}], "edges": [], "hyperedges": []}

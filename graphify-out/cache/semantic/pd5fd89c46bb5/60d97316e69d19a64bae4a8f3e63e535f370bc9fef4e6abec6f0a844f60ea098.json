@@ -1,0 +1,1 @@
+{"nodes": [{"id": "ci-workflow", "label": "GitHub Actions CI", "type": "workflow", "description": "Workflow .github/workflows/ci.yml: trigger su push main e pull_request. Esegue compileall su streamlit_app.py e src/, poi pytest. Python 3.13. Protegge deploy live.", "source_file": ".github/workflows/ci.yml", "confidence": "EXTRACTED"}], "edges": [], "hyperedges": []}

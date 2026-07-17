@@ -1,0 +1,1 @@
+{"nodes": [{"id": "setup-claude-matteo", "label": "Setup Claude Code per Matteo", "type": "doc", "description": "SETUP_CLAUDE_MATTEO.md: hook git pull automatico su SessionStart + workflow git per Federico/Matteo. settings.json non su git.", "source_file": "SETUP_CLAUDE_MATTEO.md", "confidence": "EXTRACTED"}], "edges": [], "hyperedges": []}
