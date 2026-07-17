@@ -60,8 +60,14 @@ DEMO_SAMPLE_SCOPES = {
 }
 
 
-def _user_has_missions(user_id: str) -> list[dict]:
-    """Check if user is member of any mission. Returns list of (mission_id, role) pairs."""
+def _user_has_missions(user_id: str) -> list[dict] | None:
+    """Membership rows for the user, or None if the check could not run.
+
+    None (DB error) is deliberately distinct from [] (query ran, no memberships):
+    a caller must NOT treat an error as 'no missions'. When it did, a failed check
+    pushed the user into onboarding, which creates a mission — the root cause of the
+    duplicate missions seen in the DB (e.g. 3× 'CubeSat Demo' created seconds apart).
+    """
     client = get_service_client() or get_supabase()
     if not client or not user_id:
         return []
@@ -75,8 +81,10 @@ def _user_has_missions(user_id: str) -> list[dict]:
         )
         return result.data or []
     except APIError as e:
-        # Common Supabase misconfiguration: RLS policy calls a helper function
-        # without granting EXECUTE to the authenticated role.
+        # Common Supabase misconfiguration: an RLS policy calls a SECURITY DEFINER
+        # helper without EXECUTE granted to `authenticated` -> 42501. Addressed by
+        # migration 20260619140000; still guard here so it can never silently read
+        # as 'no missions' and trigger duplicate-creating onboarding.
         if (e.args and isinstance(e.args[0], dict) and e.args[0].get("code") == "42501"):
             st.error(
                 "Supabase policy error: permission denied for function `is_mission_member`.\n\n"
@@ -84,8 +92,9 @@ def _user_has_missions(user_id: str) -> list[dict]:
                 "- `grant execute on function public.is_mission_member(uuid, uuid) to authenticated;`\n"
                 "Then re-run the app."
             )
-            return []
-        raise
+        else:
+            st.error(f"Could not verify your missions (DB error): {e}")
+        return None
 
 
 def _check_invitation(code: str) -> dict | None:
@@ -138,6 +147,12 @@ def check_onboarding_needed(user_id: str | None) -> bool:
     if not user_id:
         return False
     memberships = _user_has_missions(user_id)
+    if memberships is None:
+        # The membership check errored (DB/policy). Do NOT show onboarding: that
+        # flow creates a mission, and running it on a failed check is exactly how
+        # duplicate missions were produced. Fail safe — the surfaced st.error tells
+        # the user something is wrong instead of silently spawning a mission.
+        return False
     return len(memberships) == 0
 
 
