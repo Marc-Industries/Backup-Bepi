@@ -1,5 +1,10 @@
 """BEPI-SAT Demo Dashboard — self-contained with mock data."""
 
+# Build identifier — bumped by hand each time we ship. If a user reports
+# "I don't see the new feature", the first thing to check is the build
+# tag shown in the Settings panel and in Budget → Edit Equipment.
+_BUILD_TAG = "2026-07-18-r4"
+
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -1302,29 +1307,52 @@ if st.session_state.get("show_settings", False):
                                 "id", existing["id"]
                             ).execute()
                         if client and not str(existing["id"]).startswith("local-"):
-                            # Use the service client to bypass any per-row
-                            # RLS edge case: members are allowed to UPDATE
-                            # their own mission's modes, but if a row got
-                            # orphaned or the JWT expired mid-session the
-                            # user-scoped client silently no-ops. Fall back
-                            # to service for the rename so it always sticks.
-                            updater = get_service_client() or client
-                            try:
-                                res = updater.table("operating_modes").update(payload).eq(
-                                    "id", existing["id"]
-                                ).execute()
-                            except Exception as update_exc:
+                            # Try the user client first (RLS enforces that
+                            # members can only update their own mission's
+                            # modes). If the row count is zero, retry with
+                            # the service client (bypasses RLS). We log the
+                            # outcome of each attempt so the user can see
+                            # what actually happened.
+                            target_id = str(existing["id"])
+                            attempts = []
+                            for label, updater in (
+                                ("user", client),
+                                ("service", get_service_client() or client),
+                            ):
+                                try:
+                                    res = updater.table("operating_modes").update(
+                                        payload
+                                    ).eq("id", target_id).execute()
+                                    attempts.append(
+                                        (label, "ok" if res.data else "no_rows",
+                                         len(res.data or []))
+                                    )
+                                    if res.data:
+                                        break
+                                except Exception as update_exc:
+                                    attempts.append(
+                                        (label, "error", str(update_exc))
+                                    )
+                            if not attempts or attempts[-1][1] != "ok":
                                 st.error(
                                     f"Failed to rename '{existing['name']}' → "
-                                    f"'{payload['name']}': {update_exc}"
+                                    f"'{payload['name']}'. Attempts: {attempts}. "
+                                    f"target_id={target_id}"
                                 )
-                                raise
-                            if not res.data:
-                                st.warning(
-                                    f"Rename of '{existing['name']}' did not "
-                                    "modify any row in the database. Check "
-                                    "RLS policies on operating_modes."
-                                )
+                                # Keep going so the user sees the table; the
+                                # in-memory state will be updated regardless
+                                # of what the DB says.
+                            else:
+                                # Verify the rename actually landed.
+                                verify = (client.table("operating_modes")
+                                          .select("name").eq("id", target_id)
+                                          .execute().data or [])
+                                if verify and verify[0].get("name") != payload["name"]:
+                                    st.error(
+                                        f"Rename of '{existing['name']}' did not "
+                                        f"stick. DB still has '{verify[0].get('name')}' "
+                                        f"(expected '{payload['name']}'). target_id={target_id}"
+                                    )
                         existing.update(payload)
 
                 st.success("Operating modes saved.")
@@ -1341,8 +1369,12 @@ if st.session_state.get("show_settings", False):
             except Exception as exc:
                 st.error(f"Unable to save operating modes: {exc}")
 
-        # (Manage all missions button moved to the top of the Settings
-        # panel, right under the mission selector.)
+        # Manage all missions button moved to right under the mission
+        # selector at the top of this panel.
+
+        st.caption(
+            f"Build `{_BUILD_TAG}` • {len(settings_modes)} modes"
+        )
 
         if st.session_state.show_manage_missions:
             st.markdown("##### All Missions")
@@ -3248,7 +3280,8 @@ def page_budgets():
             modes_now = _get_operating_modes()
             st.caption(
                 f"**{len(equip_nodes)}** equipment • "
-                f"**{len(modes_now)}** operating modes"
+                f"**{len(modes_now)}** operating modes • "
+                f"build `{_BUILD_TAG}`"
             )
 
         if equip_nodes:
