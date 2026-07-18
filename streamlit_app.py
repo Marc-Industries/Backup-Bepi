@@ -3,7 +3,7 @@
 # Build identifier — bumped by hand each time we ship. If a user reports
 # "I don't see the new feature", the first thing to check is the build
 # tag shown in the Settings panel and in Budget → Edit Equipment.
-_BUILD_TAG = "2026-07-18-r4"
+_BUILD_TAG = "2026-07-18-r5"
 
 import sys
 import os
@@ -3326,9 +3326,7 @@ def page_budgets():
                     "No operating modes found for this mission. Add at least "
                     "one mode in Settings → Operating Modes to set per-mode power."
                 )
-            # Compact summary table: Code × Mode (W) — clickable. The user
-            # picks an equipment by clicking a row; the per-mode editor
-            # below shows the power values for that equipment.
+            # Compact summary table: Code × Mode (W). Always visible.
             if equipment_modes and equip_nodes:
                 mode_header = [m["name"] for m in equipment_modes]
                 summary_rows = []
@@ -3343,42 +3341,44 @@ def page_budgets():
                     row["Total"] = sum(row[m] for m in mode_header)
                     summary_rows.append(row)
                 summary_df = pd.DataFrame(summary_rows)
-                st.markdown("**Click a row to edit its per-mode power:**")
-                selection = st.dataframe(
+                st.markdown("**Per-equipment × per-mode power (W):**")
+                st.dataframe(
                     summary_df, hide_index=True, width="stretch",
-                    selection_mode="single-row",
-                    on_select="rerun",
-                    key="_bud_equip_picker",
                     column_config={
                         "Code": st.column_config.TextColumn(),
                         "Name": st.column_config.TextColumn(),
-                        "Total": st.column_config.NumberColumn(
-                            format="%.1f W",
-                        ),
+                        "Total": st.column_config.NumberColumn(format="%.1f W"),
                         **{m: st.column_config.NumberColumn(format="%.1f W")
                            for m in mode_header},
                     },
                 )
-                sel_rows = (selection or {}).get("selection", {}).get("rows", []) or []
-                if sel_rows:
-                    st.session_state["_bud_picked_idx"] = int(sel_rows[0])
-                elif "_bud_picked_idx" not in st.session_state:
-                    st.session_state["_bud_picked_idx"] = 0
-                st.caption(
-                    "Open the expander below to edit a single equipment's power "
-                    "for each mode. Changes are saved with **Save & Recalculate**."
-                )
 
             # ---- Equipment picker + per-mode power editor ---------------
-            # The user picks an equipment by clicking a row in the
-            # summary table above. Below, a single expander shows
-            # the power inputs (one per mode) for the selected
-            # equipment.
+            # Always-visible radio picker. Clicking a name selects the
+            # equipment; the per-mode expander below shows its power.
             power_inputs: dict[tuple[str, str], float] = {}
-            picked_idx = st.session_state.get("_bud_picked_idx", 0)
-            if 0 <= picked_idx < len(equip_nodes):
-                picked_node = equip_nodes[picked_idx]
+            equip_pick_labels = [
+                f"{n['code']} — {n['name']}" for n in equip_nodes
+            ]
+            cur_pick = st.session_state.get("_bud_picked_code")
+            if cur_pick not in equip_pick_labels:
+                cur_pick = equip_pick_labels[0] if equip_pick_labels else None
+                st.session_state["_bud_picked_code"] = cur_pick
+            picked_label = st.radio(
+                "Equipment to edit",
+                equip_pick_labels,
+                index=equip_pick_labels.index(cur_pick) if cur_pick in equip_pick_labels else 0,
+                key="_bud_power_pick",
+                horizontal=True,
+                help="Select the equipment whose per-mode power you want to inspect or change.",
+            )
+            if picked_label:
+                picked_node = next(
+                    (n for n in equip_nodes if f"{n['code']} — {n['name']}" == picked_label),
+                    equip_nodes[0],
+                )
                 picked_code = picked_node["code"]
+                st.session_state["_bud_picked_code"] = picked_label
                 b = eb.get(picked_code, {})
                 pwr_by_mode = b.get("power_by_mode", {}) or {}
                 st.markdown(
