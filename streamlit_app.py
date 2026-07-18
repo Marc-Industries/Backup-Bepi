@@ -1328,9 +1328,15 @@ if st.session_state.get("show_settings", False):
                         existing.update(payload)
 
                 st.success("Operating modes saved.")
-                # Force re-load on next render.
+                # Force re-load on next render. The session_state cache is
+                # discarded here, so the next call to _get_operating_modes()
+                # will SELECT fresh rows from the DB and pick up the new
+                # names. We also call it eagerly (before rerun) so the
+                # success message and the refreshed list appear in the
+                # same render pass.
                 st.session_state.pop("operating_modes", None)
                 st.session_state.pop("equip_budgets", None)
+                _get_operating_modes()  # warm the cache with fresh names
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to save operating modes: {exc}")
@@ -2037,17 +2043,38 @@ def _pt_render_edit() -> None:
         )
 
     mode_powers = {}
-    if new_level == "equipment":
+    # Show per-mode power inputs whenever the node is (or was) an
+    # equipment — that way the user can review and tweak the existing
+    # values even if they accidentally change the level dropdown.
+    if new_level == "equipment" or str(node.get("level")) == "equipment":
         equipment_budget = _get_equip_budgets().get(node.get("code"), {})
         st.markdown("##### Power consumption by operating mode")
-        mode_columns = st.columns(min(3, len(_get_operating_modes())))
-        for index, mode in enumerate(_get_operating_modes()):
-            with mode_columns[index % len(mode_columns)]:
-                mode_powers[str(mode["id"])] = st.number_input(
-                    f"{mode['name']} (W)", min_value=0.0,
-                    value=float(equipment_budget.get("power_by_mode", {}).get(str(mode["id"]), equipment_budget.get("power", 0.0) if mode.get("is_default") else 0.0)),
-                    step=0.5, key=f"_pt_edit_power_{target_id}_{mode['id']}",
-                )
+        _op_modes = _get_operating_modes()
+        if not _op_modes:
+            st.warning(
+                "No operating modes for this mission — add at least one in "
+                "Settings → Operating Modes to set per-mode power."
+            )
+        else:
+            mode_columns = st.columns(min(3, len(_op_modes)))
+            for index, mode in enumerate(_op_modes):
+                with mode_columns[index % len(mode_columns)]:
+                    default_val = equipment_budget.get(
+                        "power_by_mode", {}
+                    ).get(str(mode["id"]))
+                    if default_val is None:
+                        # Fall back to the legacy single power value, but
+                        # only for the default mode (so non-default modes
+                        # default to 0, not the same number).
+                        if mode.get("is_default"):
+                            default_val = float(equipment_budget.get("power", 0.0))
+                        else:
+                            default_val = 0.0
+                    mode_powers[str(mode["id"])] = st.number_input(
+                        f"{mode['name']} (W)", min_value=0.0,
+                        value=float(default_val),
+                        step=0.5, key=f"_pt_edit_power_{target_id}_{mode['id']}",
+                    )
 
     st.divider()
     acol1, acol2 = st.columns([1, 1])
@@ -3266,9 +3293,9 @@ def page_budgets():
                     "No operating modes found for this mission. Add at least "
                     "one mode in Settings → Operating Modes to set per-mode power."
                 )
-            # Compact summary table: Code × Mode (W) — always visible above
-            # the expanders, so the user can scan the full matrix without
-            # opening anything.
+            # Compact summary table: Code × Mode (W) — clickable. The user
+            # picks an equipment by clicking a row; the per-mode editor
+            # below shows the power values for that equipment.
             if equipment_modes and equip_nodes:
                 mode_header = [m["name"] for m in equipment_modes]
                 summary_rows = []
@@ -3283,38 +3310,40 @@ def page_budgets():
                     row["Total"] = sum(row[m] for m in mode_header)
                     summary_rows.append(row)
                 summary_df = pd.DataFrame(summary_rows)
-                st.dataframe(
+                st.markdown("**Click a row to edit its per-mode power:**")
+                selection = st.dataframe(
                     summary_df, hide_index=True, width="stretch",
+                    selection_mode="single-row",
+                    on_select="rerun",
+                    key="_bud_equip_picker",
                     column_config={
-                        "Code": st.column_config.TextColumn(disabled=True),
-                        "Name": st.column_config.TextColumn(disabled=True),
+                        "Code": st.column_config.TextColumn(),
+                        "Name": st.column_config.TextColumn(),
                         "Total": st.column_config.NumberColumn(
-                            format="%.1f W", disabled=True
+                            format="%.1f W",
                         ),
-                        **{m: st.column_config.NumberColumn(format="%.1f W", disabled=True)
+                        **{m: st.column_config.NumberColumn(format="%.1f W")
                            for m in mode_header},
                     },
                 )
+                sel_rows = (selection or {}).get("selection", {}).get("rows", []) or []
+                if sel_rows:
+                    st.session_state["_bud_picked_idx"] = int(sel_rows[0])
+                elif "_bud_picked_idx" not in st.session_state:
+                    st.session_state["_bud_picked_idx"] = 0
                 st.caption(
                     "Open the expander below to edit a single equipment's power "
                     "for each mode. Changes are saved with **Save & Recalculate**."
                 )
 
             # ---- Equipment picker + per-mode power editor ---------------
-            # The user picks an equipment, then sees a single expander
-            # containing one number_input per operating mode. This is
-            # less cluttered than N expanders and matches the requested
-            # "click on the equipment → see its modes" flow.
+            # The user picks an equipment by clicking a row in the
+            # summary table above. Below, a single expander shows
+            # the power inputs (one per mode) for the selected
+            # equipment.
             power_inputs: dict[tuple[str, str], float] = {}
-            equip_labels = [f"⚡ {n['code']} — {n['name']}" for n in equip_nodes]
-            picked_label = st.selectbox(
-                "Equipment to edit",
-                equip_labels,
-                key="_bud_power_pick",
-                help="Pick the equipment whose per-mode power you want to inspect or change.",
-            )
-            if picked_label:
-                picked_idx = equip_labels.index(picked_label)
+            picked_idx = st.session_state.get("_bud_picked_idx", 0)
+            if 0 <= picked_idx < len(equip_nodes):
                 picked_node = equip_nodes[picked_idx]
                 picked_code = picked_node["code"]
                 b = eb.get(picked_code, {})
