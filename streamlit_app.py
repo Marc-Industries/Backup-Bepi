@@ -1451,10 +1451,10 @@ if st.session_state.get("show_settings", False):
                                 st.session_state.show_settings = False
                                 st.rerun()
         
-        if st.button("Close Settings", key="btn_close_settings"):
-            st.session_state.show_settings = False
-            st.rerun()
-    
+        # Close button is rendered at the top of the Settings container
+        # (see btn_close_settings above). No duplicate needed here.
+        pass
+
     # Hide main content when Settings is open
     if st.session_state.get("show_settings", False):
         st.stop()
