@@ -1,7 +1,7 @@
 # Graph Report - BEPI  (2026-07-18)
 
 ## Corpus Check
-- 143 files · ~134,415 words
+- 144 files · ~136,293 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `afc9707e`
+- Built from commit: `c530c4ce`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

@@ -1302,9 +1302,29 @@ if st.session_state.get("show_settings", False):
                                 "id", existing["id"]
                             ).execute()
                         if client and not str(existing["id"]).startswith("local-"):
-                            client.table("operating_modes").update(payload).eq(
-                                "id", existing["id"]
-                            ).execute()
+                            # Use the service client to bypass any per-row
+                            # RLS edge case: members are allowed to UPDATE
+                            # their own mission's modes, but if a row got
+                            # orphaned or the JWT expired mid-session the
+                            # user-scoped client silently no-ops. Fall back
+                            # to service for the rename so it always sticks.
+                            updater = get_service_client() or client
+                            try:
+                                res = updater.table("operating_modes").update(payload).eq(
+                                    "id", existing["id"]
+                                ).execute()
+                            except Exception as update_exc:
+                                st.error(
+                                    f"Failed to rename '{existing['name']}' → "
+                                    f"'{payload['name']}': {update_exc}"
+                                )
+                                raise
+                            if not res.data:
+                                st.warning(
+                                    f"Rename of '{existing['name']}' did not "
+                                    "modify any row in the database. Check "
+                                    "RLS policies on operating_modes."
+                                )
                         existing.update(payload)
 
                 st.success("Operating modes saved.")
@@ -3185,6 +3205,25 @@ def page_budgets():
         eb = _get_equip_budgets()
         flat = _get_product_tree()
         equip_nodes = [n for n in flat if n["level"] == "equipment"]
+
+        # ---- Toolbar: reload + counters --------------------------------
+        toolbar_l, toolbar_r = st.columns([1, 5])
+        with toolbar_l:
+            if st.button(
+                "🔄 Reload budgets", key="_bud_equip_reload",
+                help="Force re-fetch of per-mode power from the database "
+                     "(useful if you just edited a mode in Settings).",
+            ):
+                st.session_state.pop("equip_budgets", None)
+                st.session_state.pop("operating_modes", None)
+                st.rerun()
+        with toolbar_r:
+            modes_now = _get_operating_modes()
+            st.caption(
+                f"**{len(equip_nodes)}** equipment • "
+                f"**{len(modes_now)}** operating modes"
+            )
+
         if equip_nodes:
             # ----- Top table: non-power fields ----------------------------
             eq_rows = []
@@ -3261,27 +3300,55 @@ def page_budgets():
                     "for each mode. Changes are saved with **Save & Recalculate**."
                 )
 
+            # ---- Equipment picker + per-mode power editor ---------------
+            # The user picks an equipment, then sees a single expander
+            # containing one number_input per operating mode. This is
+            # less cluttered than N expanders and matches the requested
+            # "click on the equipment → see its modes" flow.
             power_inputs: dict[tuple[str, str], float] = {}
-            for n in equip_nodes:
-                code = n["code"]
-                b = eb.get(code, {})
-                pwr_by_mode = b.get("power_by_mode", {})
-                label = f"⚡ {code} — {n['name']}"
-                with st.expander(label, expanded=False):
-                    cols = st.columns(min(3, max(1, len(equipment_modes) or 1)))
-                    for i, mode in enumerate(equipment_modes or []):
-                        with cols[i % len(cols)]:
-                            mid = str(mode["id"])
-                            key = f"_bud_power_{code}_{mid}"
-                            power_inputs[(code, mid)] = st.number_input(
-                                f"{mode['name']} (W)",
-                                min_value=0.0,
-                                value=float(pwr_by_mode.get(mid, 0.0)),
-                                step=0.5,
-                                key=key,
-                                disabled=not can("edit_budget"),
-                                format="%.1f",
-                            )
+            equip_labels = [f"⚡ {n['code']} — {n['name']}" for n in equip_nodes]
+            picked_label = st.selectbox(
+                "Equipment to edit",
+                equip_labels,
+                key="_bud_power_pick",
+                help="Pick the equipment whose per-mode power you want to inspect or change.",
+            )
+            if picked_label:
+                picked_idx = equip_labels.index(picked_label)
+                picked_node = equip_nodes[picked_idx]
+                picked_code = picked_node["code"]
+                b = eb.get(picked_code, {})
+                pwr_by_mode = b.get("power_by_mode", {}) or {}
+                st.markdown(
+                    f"**{picked_code} — {picked_node.get('name','')}** &nbsp;·&nbsp; "
+                    f"_Mass {float(b.get('mass', 0.0)):.2f} kg · "
+                    f"Qty {int(b.get('qty', 1))} · "
+                    f"Maturity {b.get('mat','estimate')}_"
+                )
+                if not equipment_modes:
+                    st.warning(
+                        "No operating modes for this mission — add one in "
+                        "Settings → Operating Modes to set per-mode power."
+                    )
+                else:
+                    with st.expander(
+                        f"Per-mode power (W) — {picked_code}",
+                        expanded=True,
+                    ):
+                        cols = st.columns(min(3, max(1, len(equipment_modes))))
+                        for i, mode in enumerate(equipment_modes):
+                            with cols[i % len(cols)]:
+                                mid = str(mode["id"])
+                                key = f"_bud_power_{picked_code}_{mid}"
+                                power_inputs[(picked_code, mid)] = st.number_input(
+                                    f"{mode['name']} (W)",
+                                    min_value=0.0,
+                                    value=float(pwr_by_mode.get(mid, 0.0)),
+                                    step=0.5,
+                                    key=key,
+                                    disabled=not can("edit_budget"),
+                                    format="%.1f",
+                                )
 
             if st.button(
                 "Save & Recalculate", key="_bud_equip_save", type="primary",
@@ -3327,12 +3394,20 @@ def page_budgets():
                                     "source": "equipment_editor",
                                 }).execute()
 
-                        # Power: one row per mode.
+                        # Power: one row per mode. Only the equipment
+                        # currently selected in the picker has fresh
+                        # values in `power_inputs`; for the other
+                        # equipment rows we keep the existing values
+                        # from the cache so Save doesn't reset them to 0.
                         power_by_mode: dict[str, float] = {}
+                        existing_pwr = eb.get(code, {}).get("power_by_mode", {}) or {}
                         if client:
                             for mode in equipment_modes:
                                 mid = str(mode["id"])
-                                power_w = float(power_inputs.get((code, mid), 0.0))
+                                if (code, mid) in power_inputs:
+                                    power_w = float(power_inputs[(code, mid)])
+                                else:
+                                    power_w = float(existing_pwr.get(mid, 0.0))
                                 power_by_mode[mid] = power_w
                                 res = client.table("budgets").update({
                                     "nominal_value": power_w, "quantity": qty,
