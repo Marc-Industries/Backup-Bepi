@@ -255,14 +255,18 @@ Verifica di sistema approfondita (Opus 4.8) + fix del debito emerso, per gravit�
 - **Jacopo Coccimiglio** — ECSS compliance: corpus deliverable/tailoring/lessons ("second brain"), lifecycle Table A-1, matrice pre-tailoring Table 7-2. Vedi `docs/ecss-corpus/`.
 
 Questo file DEVE essere aggiornato ad ogni cambiamento significativo.  
-Ultimo aggiornamento: 17 Luglio 2026
+Ultimo aggiornamento: 18 Luglio 2026
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships. **Use it before reading source files** to minimize token consumption on broad questions.
 
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+Workflow:
+- **Before answering a codebase question**: run `graphify query "<question>"` first. The BFS returns a scoped subgraph (typically 5-20 nodes) with file:line references — much smaller than reading the source.
+- **For relationships between two symbols**: `graphify path "<A>" "<B>"` returns the shortest path through the graph.
+- **For a focused concept**: `graphify explain "<symbol>"` returns the node and its 1-hop neighborhood.
+- **For broad navigation**: if `graphify-out/wiki/index.md` exists, read it instead of browsing source.
+- **For full architecture review only**: read `graphify-out/GRAPH_REPORT.md` (large).
+- **After any code change**: run `graphify update .` (AST-only, no LLM cost) to keep the graph current. Commit `graphify-out/` together with the code change.
+
+Current graph: 1329 nodes, 2746 edges, 82 communities (last refresh 2026-07-18).
