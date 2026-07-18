@@ -1022,6 +1022,15 @@ with st.sidebar:
         },
     )
 
+    # Auto-close the Settings panel + Manage Missions when the user
+    # navigates to another page from the sidebar. This prevents the
+    # modal from lingering on top of the new view.
+    _last_page = st.session_state.get("_last_nav_page")
+    if _last_page is not None and _last_page != page:
+        st.session_state.show_settings = False
+        st.session_state.show_manage_missions = False
+    st.session_state["_last_nav_page"] = page
+
     # --- Mission selector ---
     if HAS_SUPABASE:
         user = st.session_state.get("user", {})
@@ -1079,6 +1088,8 @@ with st.sidebar:
 # Initialize settings toggle state
 if "show_settings" not in st.session_state:
     st.session_state.show_settings = False
+if "show_manage_missions" not in st.session_state:
+    st.session_state.show_manage_missions = False
 
 # Warning banner if DB is not working
 if DB_ENFORCED and not HAS_SUPABASE:
@@ -1109,6 +1120,9 @@ if st.session_state.get("show_settings", False):
             _load_mission(sel_mid)
             st.rerun()
 
+        if st.button("📋 Manage all missions", key="btn_manage_all_missions"):
+            st.session_state.show_manage_missions = not st.session_state.show_manage_missions
+
         # Reload operating modes from the freshly-selected mission.
         # Without this, switching missions inside the Settings panel would
         # keep showing the previous mission's mode list.
@@ -1117,6 +1131,12 @@ if st.session_state.get("show_settings", False):
 
         st.markdown(f"#### Operating Modes ({len(settings_modes)}/{MAX_OPERATING_MODES_PER_MISSION})")
         st.caption("Configure the names used by the power budget and the Product Tree equipment inputs. Add rows to create a new mode; tick the 🗑️ column to delete an existing one.")
+        if len(settings_modes) < MAX_OPERATING_MODES_PER_MISSION:
+            st.info(
+                "➕ **To add a mode**: type its name in the empty row at the bottom of the table, "
+                "then click **Save operating modes**.",
+                icon="💡",
+            )
         # One row per existing mode + one empty row at the bottom for "Add new"
         # (only when below the cap).
         mode_df_rows = [
@@ -1128,8 +1148,10 @@ if st.session_state.get("show_settings", False):
             }
             for m in settings_modes
         ]
+        is_new_placeholder = [False] * len(settings_modes)
         if len(settings_modes) < MAX_OPERATING_MODES_PER_MISSION:
             mode_df_rows.append({"Name": "", "Description": "", "Default": False, "_delete": False})
+            is_new_placeholder.append(True)
         mode_df = pd.DataFrame(mode_df_rows)
 
         # Block the Delete column when only one mode remains, to keep the
@@ -1139,12 +1161,20 @@ if st.session_state.get("show_settings", False):
         edited_modes = st.data_editor(
             mode_df, key="_settings_operating_modes", hide_index=True, width="stretch",
             column_config={
-                "Name": st.column_config.TextColumn(required=False),
-                "Description": st.column_config.TextColumn(),
-                "Default": st.column_config.CheckboxColumn(),
+                "Name": st.column_config.TextColumn(
+                    required=False,
+                    help="Operating mode name (e.g. Commissioning, Operation).",
+                    default="+ Add Mode" if is_new_placeholder else "",
+                ),
+                "Description": st.column_config.TextColumn(
+                    help="Optional. Free-text description shown in tooltips.",
+                ),
+                "Default": st.column_config.CheckboxColumn(
+                    help="Exactly one mode per mission must be the default.",
+                ),
                 "_delete": st.column_config.CheckboxColumn(
                     label="🗑️", help="Tick to delete this mode on save",
-                    disabled=disable_delete_col,
+                    disabled=disable_delete_col, width="small",
                 ),
             },
         )
@@ -1163,6 +1193,14 @@ if st.session_state.get("show_settings", False):
 
         if save_modes_clicked:
             # --- Client-side validation -------------------------------------
+            # The Name column shows a "+ Add Mode" placeholder on the empty
+            # row; if the user left it untouched, treat it as truly empty
+            # instead of saving a literal "+ Add Mode" name.
+            edited_modes = edited_modes.copy()
+            edited_modes["Name"] = (
+                edited_modes["Name"].astype(str).str.strip()
+                .replace({"+ Add Mode": "", "nan": ""})
+            )
             valid_names = edited_modes["Name"].astype(str).str.strip()
             # At most one empty row (the "new mode" slot).
             empty_rows = (valid_names == "").sum()
@@ -1276,14 +1314,10 @@ if st.session_state.get("show_settings", False):
                 st.rerun()
             except Exception as exc:
                 st.error(f"Unable to save operating modes: {exc}")
-        
-        # Manage all missions button
-        if "show_manage_missions" not in st.session_state:
-            st.session_state.show_manage_missions = False
-        
-        if st.button("📋 Manage all missions", key="btn_manage_all_missions"):
-            st.session_state.show_manage_missions = not st.session_state.show_manage_missions
-        
+
+        # (Manage all missions button moved to the top of the Settings
+        # panel, right under the mission selector.)
+
         if st.session_state.show_manage_missions:
             st.markdown("##### All Missions")
             for mid in all_mission_ids:
@@ -1569,7 +1603,22 @@ def page_overview():
 
     _phase = st.session_state.get("mission_phase", "B2")
     _mass_limit = st.session_state.get("_bud_mass_limit", 350.0)
-    _mode = _default_operating_mode()
+    _all_modes = _get_operating_modes()
+    # Overview shows the mode the user picks here (default: the mission
+    # default). The Power Budget gauge + per-mode bar chart both honor it.
+    _mode = _all_modes[0]
+    if _all_modes:
+        _mode_labels = [m["name"] for m in _all_modes]
+        _mode_ids = [str(m["id"]) for m in _all_modes]
+        _default_mode_id = str(_default_operating_mode()["id"])
+        _default_idx = _mode_ids.index(_default_mode_id) if _default_mode_id in _mode_ids else 0
+        _picked = st.selectbox(
+            "Power mode", _all_modes,
+            index=_default_idx, format_func=lambda m: m["name"],
+            key="_ov_power_mode",
+            help="Selects which operating mode drives the Power Budget gauge and the per-mode comparison chart.",
+        )
+        _mode = _picked
     _power_limit = _power_limit_for_mode(_mode["id"], st.session_state.get("_bud_power_limit", 500.0))
     
     _prop_kg = st.session_state.get("propellant_kg", 0.0)
@@ -1877,6 +1926,10 @@ def _pt_render_add() -> None:
                     "code": new_code.strip(), "name": new_name.strip(),
                     "level": db_level, "local_id": "",
                 }
+                # Invalidate the equip_budgets cache so the Budget → Edit
+                # Equipment table sees the new node (and its per-mode
+                # power values) on the next render.
+                st.session_state.pop("equip_budgets", None)
                 st.session_state.pop("_pt_active", None)
                 st.success(f"✅ Added **{new_name}** to the product tree.")
                 st.rerun()
@@ -2025,6 +2078,10 @@ def _pt_render_edit() -> None:
                         power_result = client.table("budgets").update({"nominal_value": float(power_w), "quantity": int(new_qty)}).eq("node_id", str(target_id)).eq("budget_type", "power_w").eq("operating_mode_id", mode_id).execute()
                         if not power_result.data:
                             client.table("budgets").insert({"node_id": str(target_id), "budget_type": "power_w", "operating_mode_id": mode_id, "nominal_value": float(power_w), "unit": "W", "quantity": int(new_qty), "maturity": "estimate"}).execute()
+                # Invalidate the equip_budgets cache so the Budget → Edit
+                # Equipment table reflects the new per-mode power values
+                # on the next render.
+                st.session_state.pop("equip_budgets", None)
                 st.session_state.pop("_pt_active", None)
                 st.session_state.pop("_pt_edit_target_id", None)
                 st.success(f"✅ Updated **{new_name}**.")

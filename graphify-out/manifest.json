@@ -525,8 +525,8 @@
     "semantic_hash": ""
   },
   "streamlit_app.py": {
-    "mtime": 1784378401.3558671,
-    "ast_hash": "d0196b890db44732dcfda2cb4a338873",
+    "mtime": 1784380877.8389874,
+    "ast_hash": "b5527933ad9b0e3d7685cbeab97f6ae4",
     "semantic_hash": ""
   },
   "supabase/.temp/linked-project.json": {
@@ -659,11 +659,6 @@
     "ast_hash": "f5213e9d9cc33d89852c13c4ad4f5162",
     "semantic_hash": ""
   },
-  "Errore.txt": {
-    "mtime": 1784373681.1191454,
-    "ast_hash": "b1a2327e9f8edacb4045522c9ea33cb8",
-    "semantic_hash": ""
-  },
   "SETUP_CLAUDE_MATTEO.md": {
     "mtime": 1780519554.628859,
     "ast_hash": "cc3be2c93767334b5850635f8300cd4a",
@@ -737,6 +732,11 @@
   "requirements.txt": {
     "mtime": 1784329884.8419223,
     "ast_hash": "a29c760d1fec304c426d73c97b9978f9",
+    "semantic_hash": ""
+  },
+  "supabase/Schema_Sql_18-07-26.sql": {
+    "mtime": 1784380586.76826,
+    "ast_hash": "4da96e6fb1916479a9458359decfd593",
     "semantic_hash": ""
   }
 }
