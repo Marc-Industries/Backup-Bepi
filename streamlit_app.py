@@ -1109,6 +1109,12 @@ if st.session_state.get("show_settings", False):
             _load_mission(sel_mid)
             st.rerun()
 
+        # Reload operating modes from the freshly-selected mission.
+        # Without this, switching missions inside the Settings panel would
+        # keep showing the previous mission's mode list.
+        st.session_state.pop("operating_modes", None)
+        settings_modes = _get_operating_modes()
+
         st.markdown(f"#### Operating Modes ({len(settings_modes)}/{MAX_OPERATING_MODES_PER_MISSION})")
         st.caption("Configure the names used by the power budget and the Product Tree equipment inputs. Add rows to create a new mode; tick the 🗑️ column to delete an existing one.")
         # One row per existing mode + one empty row at the bottom for "Add new"
