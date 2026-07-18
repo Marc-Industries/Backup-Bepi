@@ -1,16 +1,16 @@
 # Graph Report - BEPI  (2026-07-18)
 
 ## Corpus Check
-- 143 files · ~133,974 words
+- 143 files · ~134,415 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1329 nodes · 2746 edges · 82 communities (80 shown, 2 thin omitted)
+- 1329 nodes · 2747 edges · 82 communities (80 shown, 2 thin omitted)
 - Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 705 edges (avg confidence: 0.67)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2ee8f8d8`
+- Built from commit: `afc9707e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -89,6 +89,8 @@
 10. `ProductNode` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `page_integrations()` --calls--> `LCAItem`  [INFERRED]
+  streamlit_app.py → src/bepi/integrations/openlca_export.py
 - `page_integrations()` --calls--> `has_spacepy()`  [INFERRED]
   streamlit_app.py → src/bepi/integrations/spenvis.py
 - `page_integrations()` --calls--> `OrbitState`  [INFERRED]
@@ -97,8 +99,6 @@
   docker-compose.yml → CLAUDE.md
 - `_load_mission()` --calls--> `load_mission_data()`  [INFERRED]
   streamlit_app.py → src/bepi/db_loader.py
-- `page_team()` --calls--> `update_mission_member()`  [INFERRED]
-  streamlit_app.py → src/bepi/db_writer.py
 
 ## Import Cycles
 - None detected.
@@ -115,8 +115,8 @@
 ## Communities (82 total, 2 thin omitted)
 
 ### Community 0 - "Celestial Bodies Data"
-Cohesion: 0.06
-Nodes (64): Any, CelestialBody, get_body(), _force_model(), generate_maneuver_script(), generate_propagation_script(), generate_stationkeeping_script(), FreeFlyer script generation — creates .MissionPlan files from BEPI parameters. (+56 more)
+Cohesion: 0.07
+Nodes (62): Any, CelestialBody, get_body(), _force_model(), generate_maneuver_script(), generate_propagation_script(), generate_stationkeeping_script(), FreeFlyer script generation — creates .MissionPlan files from BEPI parameters. (+54 more)
 
 ### Community 1 - "Risks API (FMECA/FTA)"
 Cohesion: 0.06
@@ -191,8 +191,8 @@ Cohesion: 0.19
 Nodes (18): load_missions_for_user(), _check_invitation(), check_onboarding_needed(), _create_invitation(), _generate_invite_code(), _load_user_missions(), Full-screen onboarding wizard for new users., Membership rows for the user, or None if the check could not run.      None (D (+10 more)
 
 ### Community 19 - "Thermal Model (ESATAN)"
-Cohesion: 0.16
-Nodes (28): solar_flux_at_body(), geometry_to_sat_faces(), _build_coupling_map(), _coerce_faces(), compute_eclipse_fraction_from_beta(), compute_face_fluxes(), compute_view_factor_to_body(), _effective_props() (+20 more)
+Cohesion: 0.23
+Nodes (21): _build_coupling_map(), compute_eclipse_fraction_from_beta(), _effective_props(), EnvironmentFluxes, export_esatan_input(), export_systema_thermal_csv(), heater_sizing(), plot_thermal_map() (+13 more)
 
 ### Community 20 - "Launch Vehicle Capability"
 Cohesion: 0.14
@@ -207,8 +207,8 @@ Cohesion: 0.20
 Nodes (17): BodyDef, _circle_boundary_vectors(), generate_all_kernels(), generate_ck_comment(), generate_dsk_input(), generate_fk(), generate_ik(), generate_mk() (+9 more)
 
 ### Community 23 - "Satellite 3D Model"
-Cohesion: 0.21
-Nodes (20): _add_antenna_realistic(), _add_bus_mesh(), _add_panels(), _add_radiator(), _add_subsystem_blocks(), _add_thermal_nodes_markers(), _box_faces(), create_face_to_node_mapping() (+12 more)
+Cohesion: 0.17
+Nodes (24): _add_antenna_realistic(), _add_bus_mesh(), _add_panels(), _add_radiator(), _add_subsystem_blocks(), _add_thermal_nodes_markers(), _box_faces(), create_face_to_node_mapping() (+16 more)
 
 ### Community 24 - "Audit Decisions & Schema"
 Cohesion: 0.19
@@ -267,8 +267,8 @@ Cohesion: 0.20
 Nodes (10): scripts/check_streamlit_structure.py, streamlit/_badges.py, streamlit/_bootstrap.py, streamlit/_layout.py, streamlit/_mission.py, streamlit/_mock_data.py, streamlit/pages/, streamlit/_settings.py (+2 more)
 
 ### Community 38 - "Cluster 38"
-Cohesion: 0.24
-Nodes (14): Cone, body_names(), _exchange(), export_lca_csv(), export_openlca_jsonld(), _flow_json(), generate_lca_summary(), LCAItem (+6 more)
+Cohesion: 0.36
+Nodes (9): _exchange(), export_lca_csv(), export_openlca_jsonld(), _flow_json(), generate_lca_summary(), LCAItem, LCAModel, OpenLCA JSON-LD export — generates .zip archives importable by OpenLCA 2.  Con (+1 more)
 
 ### Community 39 - "Cluster 39"
 Cohesion: 0.36
@@ -323,8 +323,8 @@ Cohesion: 0.50
 Nodes (4): print_summary(), Print a summary of all ECSS seed data., Seed ECSS data into PostgreSQL (async).     Requires running PostgreSQL and con, seed_db()
 
 ### Community 52 - "Cluster 52"
-Cohesion: 0.60
-Nodes (3): aggregate(), AggregatedOutput, PhaseOutput
+Cohesion: 0.19
+Nodes (13): Cone, body_names(), solar_flux_at_body(), interplanetary_data(), plot_interplanetary(), aggregate(), AggregatedOutput, PhaseOutput (+5 more)
 
 ### Community 77 - "Punti di decisione per tipo di prodotto"
 Cohesion: 0.22
@@ -354,7 +354,7 @@ Nodes (5): Aggiornare a una nuova revisione, Come arriva in BEPI (build → app)
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `page_integrations()` connect `Cluster 38` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Radiation Export Models`, `NASA NAC/RAC Radiation`, `Cluster 44`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Onboarding & Mission Helpers`, `Thermal Model (ESATAN)`, `Launch Vehicle Capability`, `Cluster 52`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `Station Keeping & Propellant`, `Misc Utilities (cone, etc.)`?**
+- **Why does `page_integrations()` connect `Cluster 52` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Cluster 38`, `Radiation Export Models`, `NASA NAC/RAC Radiation`, `Cluster 44`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Onboarding & Mission Helpers`, `Thermal Model (ESATAN)`, `Launch Vehicle Capability`, `Station Keeping & Propellant`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `Misc Utilities (cone, etc.)`?**
   _High betweenness centrality (0.427) - this node is a cross-community bridge._
 - **Why does `bepi.ecss` connect `Cluster 48` to `Cluster 43`, `Cluster 36`, `Onboarding & Mission Helpers`?**
   _High betweenness centrality (0.212) - this node is a cross-community bridge._

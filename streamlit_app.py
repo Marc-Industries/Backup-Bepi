@@ -1646,18 +1646,25 @@ def page_overview():
         st.markdown(f"##### Power Budget — {_mode['name']}")
         status_color_p = {"green": "#27ae60", "yellow": "#f39c12", "red": "#e74c3c"}
         color_p = status_color_p.get(power_summary.margin_status, "#27ae60")
+        # Auto-scale the gauge so the threshold + 20% headroom always fits.
+        # Without this, a mission with a 800 W limit clipped at 600 W would
+        # show the bar pegged to the top with no headroom and no green/yellow
+        # band distinction.
+        gauge_max = max(float(_power_limit or 0) * 1.2, 100.0)
+        green_end = float(_power_limit or 0) * 0.8
+        yellow_end = float(_power_limit or 0) * 0.95
         fig2 = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=power_summary.total_with_system_margin,
             delta={"reference": _power_limit, "decreasing": {"color": "#27ae60"}},
             gauge={
-                "axis": {"range": [0, 600], "tickcolor": "#666"},
+                "axis": {"range": [0, gauge_max], "tickcolor": "#666"},
                 "bar": {"color": color_p},
                 "bgcolor": "rgba(0,0,0,0)",
                 "steps": [
-                    {"range": [0, 400], "color": "rgba(39,174,96,0.15)"},
-                    {"range": [400, 450], "color": "rgba(243,156,18,0.15)"},
-                    {"range": [450, 600], "color": "rgba(231,76,60,0.15)"},
+                    {"range": [0, green_end], "color": "rgba(39,174,96,0.15)"},
+                    {"range": [green_end, yellow_end], "color": "rgba(243,156,18,0.15)"},
+                    {"range": [yellow_end, gauge_max], "color": "rgba(231,76,60,0.15)"},
                 ],
                 "threshold": {"line": {"color": "#e74c3c", "width": 3}, "value": _power_limit},
             },
@@ -1665,6 +1672,56 @@ def page_overview():
         ))
         fig2.update_layout(height=250, margin=dict(t=40, b=10, l=30, r=30), paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig2, width="stretch")
+
+        # ----- Per-mode power comparison ---------------------------------
+        # The gauge above shows the *selected* mode only. The user asked
+        # to see the other modes side-by-side. Compute the same rollup for
+        # every mode and render a compact bar chart + table.
+        all_modes = _get_operating_modes()
+        if all_modes and len(all_modes) > 1:
+            per_mode_totals = []
+            for m in all_modes:
+                if str(m["id"]) == str(_mode["id"]):
+                    per_mode_totals.append({
+                        "Mode": m["name"], "Power (W)": power_summary.total_with_system_margin,
+                        "Limit (W)": _power_limit, "Selected": True,
+                    })
+                    continue
+                m_summary = compute_budget_summary(
+                    _build_budget_tree(), _phase, "power_w",
+                    str(m["id"]), budget_limit=_power_limit,
+                )
+                per_mode_totals.append({
+                    "Mode": m["name"], "Power (W)": m_summary.total_with_system_margin,
+                    "Limit (W)": _power_limit, "Selected": False,
+                })
+            pm_df = pd.DataFrame(per_mode_totals)
+            st.markdown("**Power across operating modes**")
+            bar_fig = go.Figure(go.Bar(
+                x=pm_df["Mode"], y=pm_df["Power (W)"],
+                marker_color=["#27ae60" if s else "#3498db" for s in pm_df["Selected"]],
+                text=[f"{v:.0f} W" for v in pm_df["Power (W)"]],
+                textposition="outside",
+            ))
+            bar_fig.add_hline(
+                y=_power_limit, line_color="#e74c3c", line_dash="dash",
+                annotation_text=f"Limit {int(_power_limit)} W",
+                annotation_position="top right",
+            )
+            bar_fig.update_layout(
+                height=220, margin=dict(t=30, b=10, l=30, r=30),
+                paper_bgcolor="rgba(0,0,0,0)",
+                yaxis_title="W", showlegend=False,
+            )
+            st.plotly_chart(bar_fig, width="stretch")
+            st.dataframe(
+                pm_df, hide_index=True, width="stretch",
+                column_config={
+                    "Selected": st.column_config.CheckboxColumn(disabled=True),
+                    "Power (W)": st.column_config.NumberColumn(format="%.1f"),
+                    "Limit (W)": st.column_config.NumberColumn(format="%.0f"),
+                },
+            )
 
     # Review timeline with sac.steps
     st.markdown("<br>", unsafe_allow_html=True)
@@ -3108,6 +3165,45 @@ def page_budgets():
             # ----- Per-equipment, per-mode power inputs -------------------
             st.markdown("##### Power (W) per equipment and operating mode")
             equipment_modes = _get_operating_modes()
+            if not equipment_modes:
+                st.warning(
+                    "No operating modes found for this mission. Add at least "
+                    "one mode in Settings → Operating Modes to set per-mode power."
+                )
+            # Compact summary table: Code × Mode (W) — always visible above
+            # the expanders, so the user can scan the full matrix without
+            # opening anything.
+            if equipment_modes and equip_nodes:
+                mode_header = [m["name"] for m in equipment_modes]
+                summary_rows = []
+                for n in equip_nodes:
+                    code = n["code"]
+                    b = eb.get(code, {})
+                    pwr_by_mode = b.get("power_by_mode", {}) or {}
+                    row = {"Code": code, "Name": n.get("name", "")}
+                    for mode in equipment_modes:
+                        mid = str(mode["id"])
+                        row[mode["name"]] = float(pwr_by_mode.get(mid, 0.0))
+                    row["Total"] = sum(row[m] for m in mode_header)
+                    summary_rows.append(row)
+                summary_df = pd.DataFrame(summary_rows)
+                st.dataframe(
+                    summary_df, hide_index=True, width="stretch",
+                    column_config={
+                        "Code": st.column_config.TextColumn(disabled=True),
+                        "Name": st.column_config.TextColumn(disabled=True),
+                        "Total": st.column_config.NumberColumn(
+                            format="%.1f W", disabled=True
+                        ),
+                        **{m: st.column_config.NumberColumn(format="%.1f W", disabled=True)
+                           for m in mode_header},
+                    },
+                )
+                st.caption(
+                    "Open the expander below to edit a single equipment's power "
+                    "for each mode. Changes are saved with **Save & Recalculate**."
+                )
+
             power_inputs: dict[tuple[str, str], float] = {}
             for n in equip_nodes:
                 code = n["code"]
@@ -3115,8 +3211,8 @@ def page_budgets():
                 pwr_by_mode = b.get("power_by_mode", {})
                 label = f"⚡ {code} — {n['name']}"
                 with st.expander(label, expanded=False):
-                    cols = st.columns(min(3, max(1, len(equipment_modes))))
-                    for i, mode in enumerate(equipment_modes):
+                    cols = st.columns(min(3, max(1, len(equipment_modes) or 1)))
+                    for i, mode in enumerate(equipment_modes or []):
                         with cols[i % len(cols)]:
                             mid = str(mode["id"])
                             key = f"_bud_power_{code}_{mid}"
