@@ -1050,6 +1050,15 @@ with st.sidebar:
         mission_ids = list(missions.keys())
         active_mid = st.session_state.get("active_mission_id") or (mission_ids[0] if mission_ids else None)
 
+        # Load the active mission's ROW data (requirements/risks/tasks) if not yet
+        # loaded this session. The block above only loads mission *metadata*; product
+        # tree and budgets load on-demand (so they appear), but requirements/risks/
+        # tasks come from session_state and would stay empty at first boot until the
+        # user manually switched mission — which is why they looked "disappeared".
+        if active_mid and DB_ENFORCED and st.session_state.get("_loaded_mission_id") != active_mid:
+            st.session_state.active_mission_id = active_mid
+            _load_mission(active_mid)
+
         if not mission_ids:
             if DB_ENFORCED:
                 st.warning("No missions found in the database. Create a mission from the Settings panel or complete onboarding.")
