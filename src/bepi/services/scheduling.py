@@ -103,6 +103,18 @@ def compute_cpm(tasks: list[TaskData], project_start: date | None = None) -> CPM
     )
 
 
+def _as_date(v) -> date | None:
+    """Coerce a task date (may be a date, an ISO string from the DB, or None)."""
+    if isinstance(v, date):
+        return v
+    if isinstance(v, str) and v:
+        try:
+            return date.fromisoformat(v[:10])
+        except ValueError:
+            return None
+    return None
+
+
 def gantt_data(tasks: list[TaskData], cpm_result: CPMResult, project_start: date) -> list[dict]:
     """Generate Gantt chart data for Plotly.
     Returns list of dicts with: Task, Start, Finish, Progress, Critical, WBS, Resource
@@ -110,8 +122,15 @@ def gantt_data(tasks: list[TaskData], cpm_result: CPMResult, project_start: date
     result = []
     for t in tasks:
         info = cpm_result.tasks.get(t.id, {})
-        start = project_start + timedelta(days=info.get("ES", 0))
-        end = project_start + timedelta(days=info.get("EF", 0))
+        # Prefer the task's own planned dates (from the DB) so the bars reflect the
+        # real schedule; fall back to the CPM early-start/finish when dates are absent
+        # (e.g. mock data, or tasks with no stored dates -> everything at project_start).
+        ts, te = _as_date(t.start_date), _as_date(t.end_date)
+        if ts and te:
+            start, end = ts, te
+        else:
+            start = project_start + timedelta(days=info.get("ES", 0))
+            end = project_start + timedelta(days=info.get("EF", 0))
         is_critical = t.id in cpm_result.critical_path
 
         result.append({

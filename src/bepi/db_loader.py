@@ -83,11 +83,14 @@ def load_mission_data(mission_id: str) -> dict:
     # Build budgets map keyed by node code
     budgets_map: dict[str, dict] = {}
     all_nodes = nodes_result.data or []
+    # Real TRL per node code (the TRL/MAIT page reads eb[code]["trl"]); previously
+    # hardcoded to 6, which made every component read TRL 6 regardless of the tree.
+    node_trl = {n.get("code"): n.get("trl") for n in all_nodes if n.get("code")}
     all_budgets = client.table("budgets").select("*, product_tree_nodes(code)").execute().data or []
     for b in all_budgets:
         code = b.get("product_tree_nodes", {}).get("code", "") if isinstance(b.get("product_tree_nodes"), dict) else ""
         if code:
-            current = budgets_map.setdefault(code, {"mass": 0, "power": 0, "power_by_mode": {}, "qty": 1, "mat": "estimate", "trl": 6})
+            current = budgets_map.setdefault(code, {"mass": 0, "power": 0, "power_by_mode": {}, "qty": 1, "mat": "estimate", "trl": node_trl.get(code) or 5})
             if b["budget_type"] == "mass_kg":
                 current["mass"] = b["nominal_value"]
             elif b["budget_type"] == "power_w":
