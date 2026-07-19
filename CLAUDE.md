@@ -237,6 +237,15 @@ Verifica di sistema approfondita (Opus 4.8) + fix del debito emerso, per gravit�
 - **RLS**: INSERT/UPDATE/SELECT su `operating_modes` permesso a qualsiasi membro della missione (`is_mission_member`). DELETE solo a PM/SE (`has_mission_role(..., ARRAY['PM','SE'])`). Migration: `supabase/migrations/20260717170000_power_budget_operating_modes.sql`.
 - **Power limit per mode**: out of scope (vedi `OPERATING_MODES_FEATURE.md` §6). Per ora il `power_limit` è scritto solo per il default mode.
 
+## Demo Mission & Data-Loading Fixes (2026-07-19)
+
+Creata una **missione demo popolata** (`DEMO — EO SmallSat (BEPI Showcase)`, `fc176cce…`) per walkthrough a colleghi UNIPD + un contatto ESA: 40 nodi product tree, budget massa/potenza con margini, 15 requisiti, 8 rischi, 16 task, gate ECSS PDR. Membri agganciati via `mission_members` (Federico ADMIN, Stefano PM, resto QA — l'enum `team_role` **non ha `USER`**, quindi QA è il "view-only" più vicino). Popolarla ha esposto una **catena di bug**, tutti con la stessa origine (primo dataset reale su ogni tabella), risolti per gravità:
+
+- **🔴 Entità dal DB come dict invece che oggetti (`7567a4e`)**: `db_loader._map_requirement/_map_task/_map_risk/_map_fmeca_entry` ritornavano dict, ma `streamlit_app` accede alle entità come **oggetti** (dataclass `services/*`) in ~50 punti. La prima missione con dati veri crashava Overview (risks: `r.risk_id` su dict), Schedule/Team (CPM vuole `t.id`/`t.predecessors`; nota: `mock_data.TaskData` ha `task_id`/`predecessor_ids`, diverso da `services.scheduling.TaskData` → Schedule era rotto anche col mock, mai aperto con task). Fix: i `_map_*` ora costruiscono le dataclass `services/` (aggiunto `node_id` a `FMECAEntryData`). Regression test `tests/unit/test_risk_loading.py`.
+- **🔴 Dati missione non caricati al boot (`56bc9b4`)**: root cause di "requirements/risks/tasks spariti". Al boot si caricava solo la **lista** missioni + `active_mission_id`; `_load_mission()` (che popola risk/task/req in `session_state`) partiva **solo al cambio missione manuale**. Product tree e budget si caricano on-demand (query cachata) → apparivano, mascherando il buco. Dopo un reboot (sessione pulita) le tre entità erano vuote. Fix: nel mission selector, se `_loaded_mission_id != active_mid` (e `DB_ENFORCED`), carica i dati della missione attiva. ⚠️ Il "Gantt vuoto" era **questo** (0 task in sessione), non la serializzazione — il fix ISO-string del Gantt (`49cd333`) resta come hardening innocuo.
+- **🟠 Gantt & TRL realistici (`02c59eb`)**: `db_loader` hardcodava `trl=6` nel budgets_map → la pagina TRL leggeva 6 per tutti; ora legge il TRL reale dei nodi. `gantt_data` ricalcolava ogni barra da CPM early-start (senza dipendenze salvate, tutto a `project_start`); ora preferisce le `start/end_date` reali del task. Dati demo aggiornati (date dal CPM sulle dipendenze mock, TRL 4-9 per sottosistema).
+- **🟡 Integrations export + privacy (`66fbdff`)**: `export_master_config`/`export_drama_config` chiamate con argomenti sbagliati (come oggetto invece che spacchettato) → `TypeError` su DAS/DRAMA/MASTER. Colonna UUID utenti rimossa dalla tabella Team (privacy). Settings: bottone **✕** per chiudere (`9216527`).
+
 ---
 
 ## Roadmap Futuro
@@ -255,7 +264,7 @@ Verifica di sistema approfondita (Opus 4.8) + fix del debito emerso, per gravit�
 - **Jacopo Coccimiglio** — ECSS compliance: corpus deliverable/tailoring/lessons ("second brain"), lifecycle Table A-1, matrice pre-tailoring Table 7-2. Vedi `docs/ecss-corpus/`.
 
 Questo file DEVE essere aggiornato ad ogni cambiamento significativo.  
-Ultimo aggiornamento: 18 Luglio 2026
+Ultimo aggiornamento: 19 Luglio 2026
 
 ## graphify
 
