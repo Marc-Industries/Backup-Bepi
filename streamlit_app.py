@@ -34,7 +34,7 @@ from bepi.services.requirements import (
 from bepi.services.risks import (
     RiskItemData, FMECAEntryData, risk_matrix, fmeca_ranking, compute_criticality,
 )
-from bepi.services.scheduling import TaskData, compute_cpm, gantt_data
+from bepi.services.scheduling import TaskData, compute_cpm, gantt_data, infer_predecessors_from_dates, project_start_from_tasks
 from bepi.ecss.margins import COMPONENT_MARGINS, SYSTEM_MARGINS, get_component_margin, get_system_margin
 from bepi.ecss.phases import (PHASE_DEFINITIONS, PHASE_GATE_REVIEWS, PHASE_TRANSITIONS,
     NASA_PHASE_DEFINITIONS, NASA_PHASE_GATE_REVIEWS, NASA_PHASE_TRANSITIONS,
@@ -1620,6 +1620,13 @@ _normalize_fmeca_entries()
 
 def get_tasks():
     return st.session_state.tasks
+
+def _schedule_cpm():
+    """CPM over the current tasks with dependencies inferred from real dates
+    (the DB stores none), so duration / end date / critical path are real."""
+    tasks = get_tasks()
+    infer_predecessors_from_dates(tasks)
+    return compute_cpm(tasks, project_start_from_tasks(tasks, date(2025, 10, 1)))
 
 def get_requirements():
     return st.session_state.requirements
@@ -4287,7 +4294,8 @@ def page_risks():
 def page_schedule():
     colored_header(label="Schedule", description="Gantt chart, critical path & milestones", color_name="light-blue-70")
     all_tasks = get_tasks()
-    project_start = date(2025, 10, 1)
+    infer_predecessors_from_dates(all_tasks)  # DB stores no deps; rebuild from real dates so CPM is real
+    project_start = project_start_from_tasks(all_tasks, date(2025, 10, 1))
     cpm = compute_cpm(all_tasks, project_start)
 
     # Filter bar
@@ -5297,9 +5305,9 @@ REPORT_TYPES = {
             ],
             "req_coverage": [{"level": k, "total": v["total"], "verified": v["verified"], "pct": v["pct"]}
                              for k, v in coverage_report(get_requirements())["by_level"].items()],
-            "schedule_duration": compute_cpm(get_tasks(), date(2025, 10, 1)).project_duration,
-            "schedule_end": str(compute_cpm(get_tasks(), date(2025, 10, 1)).project_end_date),
-            "critical_tasks": sum(1 for t in get_tasks() if t.id in compute_cpm(get_tasks(), date(2025, 10, 1)).critical_path and not t.is_milestone),
+            "schedule_duration": _schedule_cpm().project_duration,
+            "schedule_end": str(_schedule_cpm().project_end_date),
+            "critical_tasks": sum(1 for t in get_tasks() if t.id in _schedule_cpm().critical_path and not t.is_milestone),
             "overall_progress": (sum(t.progress_pct for t in get_tasks()) / len(get_tasks())) if get_tasks() else 0,
             "action_items": [
                 {"type": "Design", "action": "Complete AOCS detailed mode analysis", "owner": "G. Conti", "due": "2026-05-01", "status": "Open"},
@@ -6073,7 +6081,8 @@ def page_team():
     with tab_workload:
         st.markdown("##### Task Assignments per Person")
         tasks = get_tasks()
-        project_start = date(2025, 10, 1)
+        infer_predecessors_from_dates(tasks)
+        project_start = project_start_from_tasks(tasks, date(2025, 10, 1))
         cpm_result = compute_cpm(tasks, project_start)
 
         workload_data = []

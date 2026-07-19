@@ -115,6 +115,34 @@ def _as_date(v) -> date | None:
     return None
 
 
+def infer_predecessors_from_dates(tasks: list[TaskData]) -> None:
+    """Reconstruct task dependencies from real start/end dates, in place.
+
+    The schedule_tasks table stores no dependency column, so tasks loaded from the
+    DB have empty `predecessors` and CPM degenerates (every task starts at t0 →
+    critical path = just the longest tasks, project duration = longest single task).
+    When tasks carry real dates, each task's driving predecessor is whichever
+    task(s) finish latest at or before its start; wiring those makes CPM reproduce
+    the real schedule (correct critical path, duration, end date). No-op if any
+    explicit dependency already exists (don't override real data)."""
+    if any(t.predecessors for t in tasks):
+        return
+    dated = [(t, _as_date(t.start_date), _as_date(t.end_date)) for t in tasks]
+    for t, ts, _ in dated:
+        if not ts:
+            continue
+        ends = [(o, oe) for o, os, oe in dated if o is not t and oe and oe <= ts]
+        if ends:
+            latest = max(oe for _, oe in ends)
+            t.predecessors = [o.id for o, oe in ends if oe == latest]
+
+
+def project_start_from_tasks(tasks: list[TaskData], default: date) -> date:
+    """Earliest real task start, or `default` when no dates are present."""
+    starts = [d for d in (_as_date(t.start_date) for t in tasks) if d]
+    return min(starts) if starts else default
+
+
 def gantt_data(tasks: list[TaskData], cpm_result: CPMResult, project_start: date) -> list[dict]:
     """Generate Gantt chart data for Plotly.
     Returns list of dicts with: Task, Start, Finish, Progress, Critical, WBS, Resource
