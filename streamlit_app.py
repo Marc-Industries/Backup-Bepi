@@ -4325,7 +4325,7 @@ def page_schedule():
 
             if is_milestone:
                 fig.add_trace(go.Scatter(
-                    x=[pd.Timestamp(row["Start"])], y=[y_idx],
+                    x=[row["Start"]], y=[y_idx],
                     mode="markers", marker=dict(size=14, symbol="diamond", color="#9b59b6",
                                                 line=dict(width=2, color="white")),
                     showlegend=False,
@@ -4342,16 +4342,19 @@ def page_schedule():
                 duration = finish_dt - start_dt
                 done_end = start_dt + duration * progress
 
-                fig.add_shape(type="rect", x0=start_dt, x1=finish_dt, y0=y_idx - bar_h, y1=y_idx + bar_h,
+                # Pass ISO strings (not pd.Timestamp) to shapes/traces: on plotly 6.9
+                # a Timestamp inside a shape can fail to serialise for the frontend and
+                # the whole Gantt renders blank. Strings on a type="date" axis are safe.
+                fig.add_shape(type="rect", x0=start_dt.isoformat(), x1=finish_dt.isoformat(), y0=y_idx - bar_h, y1=y_idx + bar_h,
                               fillcolor=remaining_color, line=dict(color=bar_color, width=1.5))
 
                 if progress > 0:
-                    fig.add_shape(type="rect", x0=start_dt, x1=done_end, y0=y_idx - bar_h, y1=y_idx + bar_h,
+                    fig.add_shape(type="rect", x0=start_dt.isoformat(), x1=done_end.isoformat(), y0=y_idx - bar_h, y1=y_idx + bar_h,
                                   fillcolor=done_color, line=dict(width=0))
 
                 mid_dt = start_dt + duration / 2
                 fig.add_trace(go.Scatter(
-                    x=[mid_dt], y=[y_idx], mode="markers",
+                    x=[mid_dt.isoformat()], y=[y_idx], mode="markers",
                     marker=dict(size=0.1, opacity=0),
                     showlegend=False,
                     hovertext=f"<b>{task_name}</b><br>{row['Start']} → {row['Finish']}<br>Progress: {row['Progress']:.0f}%{'<br>⚠ CRITICAL' if is_critical else ''}",
@@ -4360,7 +4363,7 @@ def page_schedule():
 
                 if 0 < progress < 1.0:
                     mid = start_dt + duration * progress / 2
-                    fig.add_annotation(x=mid, y=y_idx, text=f"{row['Progress']:.0f}%",
+                    fig.add_annotation(x=mid.isoformat(), y=y_idx, text=f"{row['Progress']:.0f}%",
                                        showarrow=False, font=dict(size=9, color="white"))
 
         today_str = date.today().isoformat()
