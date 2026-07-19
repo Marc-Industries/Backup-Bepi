@@ -5849,7 +5849,8 @@ def page_team():
             task_count = sum(1 for a in get_task_assignments().values() if a.get("responsible") == m["id"])
             req_count = sum(1 for o in get_req_ownership().values() if o.get("owner") == m["id"])
             roster_rows.append({
-                "ID": m["id"],
+                # user UUID intentionally not shown (privacy); the save loop below
+                # keys on row index + get_team(), not on a displayed ID column.
                 "Name": m["name"],
                 "Role": ROLES[m["role"]]["name"],
                 "Subsystem": m.get("subsystem", "—"),
@@ -5863,7 +5864,6 @@ def page_team():
                 df_team, key="_team_roster_editor", hide_index=True, width="stretch",
                 height=min(len(roster_rows) * 38 + 40, 400),
                 column_config={
-                    "ID": st.column_config.TextColumn(disabled=True),
                     "Name": st.column_config.TextColumn(),
                     "Role": st.column_config.SelectboxColumn(options=role_names, required=True),
                     "Subsystem": st.column_config.SelectboxColumn(options=subsys_options, required=True),
@@ -7834,7 +7834,7 @@ def page_integrations():
                     drama_cfg = export_drama_config(dp.altitude_km, dp.inclination_deg, dp.mass_kg, dp.cross_section_m2, mission_name=dp.mission_name)
                     st.download_button("📥 DRAMA config", drama_cfg, "BEPI_DRAMA_config.txt", "text/plain", key="exp_drama")
                 with ec3:
-                    master_cfg = export_master_config(das_alt, das_area)
+                    master_cfg = export_master_config(das_alt, das_inc, das_area)
                     st.download_button("📥 MASTER config", master_cfg, "BEPI_MASTER_config.txt", "text/plain", key="exp_master")
 
         elif env_sub == "Sustainability Indices":
