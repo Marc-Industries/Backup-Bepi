@@ -1,7 +1,7 @@
 # Graph Report - BEPI  (2026-07-20)
 
 ## Corpus Check
-- 147 files · ~149,016 words
+- 147 files · ~150,077 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary

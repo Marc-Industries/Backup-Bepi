@@ -2994,6 +2994,13 @@ def page_product_tree():
   }
   .budget-btn-cancel:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
+  .default-pill {
+    display: inline-block; margin-left: 4px;
+    padding: 1px 6px; border-radius: 4px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+    color: #0d1117; background: var(--emerald);
+  }
+
   .maturity-pill {
     display: inline-block; padding: 3px 8px; border-radius: 6px;
     font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -3408,21 +3415,32 @@ function renderBudget() {
     const isOpen = openEquipId === item.id;
     const itemTotal = Object.values(item.power_by_mode || {})
       .reduce((a, v) => a + Number(v || 0), 0);
-    const modeSummary = (operatingModes || []).map(m => {
-      const v = (item.power_by_mode || {})[m.id] || 0;
-      return `${m.name} <b>${Number(v).toFixed(1)} W</b>`;
-    }).join(' &nbsp;·&nbsp; ');
+    // Power cell shows ONLY the default-mode value (and a small marker).
+    // Other modes' values are visible/editable inside the expand panel.
+    const defaultMode = (operatingModes || []).find(m => m.is_default)
+      || (operatingModes || [])[0];
+    const defaultModeId = defaultMode ? String(defaultMode.id) : null;
+    const defaultModeName = defaultMode ? defaultMode.name : "Default";
+    const defaultW = defaultModeId
+      ? Number((item.power_by_mode || {})[defaultModeId] || 0)
+      : 0;
+    const otherModeCount = Math.max(
+      0, (operatingModes || []).length - (defaultModeId ? 1 : 0)
+    );
 
     let html = `
       <tr class="budget-row ${isOpen ? 'open' : ''}" onclick="toggleEquipDetail('${item.id}')" title="Click to edit">
         <td class="cell-eq-code">${item.code}</td>
         <td style="font-weight:600;color:var(--text-primary)">${item.name}</td>
         <td>${Number(item.mass || 0).toFixed(2)}</td>
-        <td style="font-weight:700;color:var(--text-muted)">${item.qty}</td>
         <td><span class="maturity-pill maturity-${item.maturity}">${item.maturity}</span></td>
         <td class="cell-trl">${item.trl}</td>
-        <td style="font-size:12px;color:var(--text-secondary);min-width:280px;">${modeSummary || '<span style="color:var(--text-muted);">no modes</span>'}</td>
-        <td style="text-align:right;font-weight:700;color:var(--emerald);">${itemTotal.toFixed(1)} W</td>
+        <td style="text-align:right;font-weight:700;color:var(--emerald);">
+          ${defaultW.toFixed(1)} W
+          <span style="display:block;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">
+            ${defaultModeName}${otherModeCount > 0 ? ` + ${otherModeCount} other` : ''}
+          </span>
+        </td>
         <td style="text-align:right;color:var(--blue);font-size:11px;width:90px;">${isOpen ? '▾ editing' : 'click to edit →'}</td>
       </tr>`;
 
@@ -3439,12 +3457,16 @@ function renderBudget() {
           })
       ].join('');
 
-      // Per-mode power rows, one input per mode.
+      // Per-mode power rows, one input per mode. The default mode is
+      // marked with a small badge so the user knows which value drives
+      // the table column.
+      const defaultMid = defaultModeId;
       const modeRows = (operatingModes || []).map(m => {
         const cur = (item.power_by_mode || {})[m.id] || 0;
+        const isDefault = String(m.id) === String(defaultMid);
         return `
           <div class="budget-mode-row">
-            <label>${m.name} (W)</label>
+            <label>${m.name}${isDefault ? ' <span class="default-pill">default</span>' : ''} (W)</label>
             <input class="budget-input" type="number" min="0" step="0.5"
                 value="${cur}"
                 id="bp_${item.id}_${m.id}"/>
@@ -3521,12 +3543,12 @@ function renderBudget() {
       <table style="white-space:nowrap">
         <thead><tr>
           <th>Equipment Code</th><th>Name</th><th>Mass (kg)</th>
-          <th>Qty</th><th>Maturity</th><th>TRL</th>
-          <th>Power by mode</th><th>Σ Power</th><th></th>
+          <th>Maturity</th><th>TRL</th>
+          <th>Power (default mode)</th><th></th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px;">No equipment nodes yet — add one in the Tree view.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">No equipment nodes yet — add one in the Tree view.</td></tr>'}</tbody>
         ${equip.length ? `<tfoot><tr style="background:rgba(13,17,23,0.4);font-weight:700;">
-          <td colspan="7" style="text-align:right;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">Total Σ power across all equipment × all modes</td>
+          <td colspan="5" style="text-align:right;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">Total Σ power across all equipment × all modes</td>
           <td style="color:var(--emerald);">${totalW.toFixed(1)} W</td>
           <td></td>
         </tr></tfoot>` : ''}
