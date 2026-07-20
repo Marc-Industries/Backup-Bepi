@@ -65,8 +65,8 @@
     "semantic_hash": ""
   },
   "src/bepi/auth.py": {
-    "mtime": 1784539207.0758898,
-    "ast_hash": "c96d86b7d690b09e9571b60a04f6125c",
+    "mtime": 1784579921.2656553,
+    "ast_hash": "fa7dae9edc79fc3030cc8969ef3267d9",
     "semantic_hash": ""
   },
   "src/bepi/cli.py": {
@@ -757,6 +757,21 @@
   "tests/unit/test_propagators.py": {
     "mtime": 1784561688.9691067,
     "ast_hash": "8aeed9dc906590b534c0723d802362fb",
+    "semantic_hash": ""
+  },
+  "supabase/functions/sso-unipd/deno.json": {
+    "mtime": 1784562769.9675806,
+    "ast_hash": "49fdf9837396e3213e68cfb82e985b43",
+    "semantic_hash": ""
+  },
+  "supabase/functions/sso-unipd/index.ts": {
+    "mtime": 1784562762.237616,
+    "ast_hash": "a80eac13c7354a529f96eed08d2b760a",
+    "semantic_hash": ""
+  },
+  "tests/unit/test_sso_callback.py": {
+    "mtime": 1784579951.537684,
+    "ast_hash": "764685da77c6dad89dfc2bff8625d700",
     "semantic_hash": ""
   }
 }

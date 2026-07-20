@@ -78,6 +78,60 @@ def _restore_from_cookie(cc) -> bool:
     return False
 
 
+def _handle_sso_callback(cc) -> bool:
+    """Consume the SSO callback redirected back from the sso-unipd Edge
+    Function. The IdP-issued SAMLResponse was already verified server-side;
+    here we just exchange the magic-link `token_hash` for a Supabase
+    session and persist it the same way the password sign-in path does.
+
+    Returns True if a session was established (caller should rerun).
+    """
+    qp = st.query_params
+    token_hash = qp.get("sso_token_hash")
+    email = qp.get("sso_email")
+    if not token_hash or not email:
+        return False
+    client = get_supabase()
+    if not client:
+        st.error("❌ SSO callback received but Supabase is not configured.")
+        st.query_params.clear()
+        return False
+    try:
+        result = client.auth.verify_otp({
+            "token_hash": str(token_hash),
+            "type": "magiclink",
+            "email": str(email),
+        })
+        if not result or not result.user or not result.session:
+            st.error("❌ SSO callback: could not establish a session.")
+            st.query_params.clear()
+            return False
+        st.session_state["user"] = _user_dict(result.user)
+        st.session_state["supabase_token"] = result.session.access_token
+        st.session_state["supabase_refresh_token"] = result.session.refresh_token
+        if cc:
+            cc.set(_COOKIE_TOKEN, result.session.access_token, max_age=_COOKIE_MAX_AGE)
+            cc.set(_COOKIE_REFRESH, result.session.refresh_token, max_age=_COOKIE_MAX_AGE)
+        st.query_params.clear()
+        return True
+    except Exception as e:
+        st.error(f"❌ SSO callback failed: {e}")
+        st.query_params.clear()
+        return False
+
+
+def _sso_button_url() -> str | None:
+    """Build the Edge Function login URL from the Supabase project URL.
+    Returns None if Supabase isn't configured (button is hidden)."""
+    try:
+        url = st.secrets.get("supabase", {}).get("url", "")
+    except Exception:
+        url = ""
+    if not url:
+        return None
+    return f"{url.rstrip('/')}/functions/v1/sso-unipd?action=login"
+
+
 def render_auth_ui():
     cc = _cookie_ctrl()
 
@@ -86,7 +140,12 @@ def render_auth_ui():
         return st.session_state.get("user")
 
     if "user" in st.session_state:
-        return st.session_state["user"]
+        return st.session_state.get("user")
+
+    # SSO callback from the sso-unipd Edge Function (?sso_token_hash=…&sso_email=…).
+    # If present, exchange the magic-link token for a session, then rerun.
+    if _handle_sso_callback(cc):
+        st.rerun()
 
     st.markdown("""
     <style>
@@ -160,6 +219,8 @@ def render_auth_ui():
 
     tab_login, tab_signup = st.tabs(["🔐 Sign In", "✨ Sign Up"])
 
+    sso_url = _sso_button_url()
+
     with tab_login:
         st.markdown("---")
         email_input = st.text_input("Email Address", placeholder="name@example.com", key="_auth_email")
@@ -187,6 +248,22 @@ def render_auth_ui():
             else:
                 st.warning("⚠️ Please enter both email and password")
 
+        # UniPD SSO — link button (renders as a styled <a> that does a
+        # top-level navigation to the Edge Function, which then redirects
+        # to the IdP). Hidden when Supabase isn't configured.
+        if sso_url:
+            st.markdown(
+                "<div style='text-align:center;margin:18px 0 6px;"
+                "font-size:11px;color:#64748b;letter-spacing:0.08em;"
+                "text-transform:uppercase;'>— or —</div>",
+                unsafe_allow_html=True,
+            )
+            st.link_button(
+                "🎓 Login with UniPD SSO",
+                sso_url,
+                use_container_width=True,
+            )
+
     with tab_signup:
         st.markdown("---")
         full_name = st.text_input("Full Name", placeholder="Your full name", key="_auth_name")
@@ -209,6 +286,19 @@ def render_auth_ui():
                     st.error("❌ Sign-up failed. Email may already be registered.")
             else:
                 st.warning("⚠️ Please enter both email and password")
+
+        if sso_url:
+            st.markdown(
+                "<div style='text-align:center;margin:18px 0 6px;"
+                "font-size:11px;color:#64748b;letter-spacing:0.08em;"
+                "text-transform:uppercase;'>— or —</div>",
+                unsafe_allow_html=True,
+            )
+            st.link_button(
+                "🎓 Sign up with UniPD SSO",
+                sso_url,
+                use_container_width=True,
+            )
 
     st.markdown("""
     <div class="auth-footer">
