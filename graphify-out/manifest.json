@@ -525,8 +525,8 @@
     "semantic_hash": ""
   },
   "streamlit_app.py": {
-    "mtime": 1784548345.5975633,
-    "ast_hash": "1176b6ab88ec8fab5ae93105a0162c6d",
+    "mtime": 1784561870.9380968,
+    "ast_hash": "ea6cdff437d3d66d64af2d6539dc17e9",
     "semantic_hash": ""
   },
   "supabase/.temp/linked-project.json": {
@@ -650,8 +650,8 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1784546012.6599474,
-    "ast_hash": "d5521e376f26882bb0bd61a275578932",
+    "mtime": 1784561688.9616873,
+    "ast_hash": "8668f44979885f3cc9669ac5aa963432",
     "semantic_hash": ""
   },
   "Command.md": {
@@ -730,13 +730,33 @@
     "semantic_hash": ""
   },
   "requirements.txt": {
-    "mtime": 1784539207.0685303,
-    "ast_hash": "e217211a79471e42f093a35a82263ef9",
+    "mtime": 1784561688.962454,
+    "ast_hash": "dbb257905cd07582d7f5c8f6af3d1f65",
     "semantic_hash": ""
   },
   "packages.txt": {
     "mtime": 1784539207.0677671,
     "ast_hash": "afa2947fd933d11317ff79a3322aa6e3",
+    "semantic_hash": ""
+  },
+  "src/bepi/integrations/mission_sim.py": {
+    "mtime": 1784561688.9632013,
+    "ast_hash": "97e4de9c352a7de87df6e3595bdef6ac",
+    "semantic_hash": ""
+  },
+  "tests/unit/test_boot_mock.py": {
+    "mtime": 1784561688.9681487,
+    "ast_hash": "11f79258f5f483aac9f63005c9882710",
+    "semantic_hash": ""
+  },
+  "tests/unit/test_mission_sim.py": {
+    "mtime": 1784561688.968623,
+    "ast_hash": "a86a84f8f6ec099e3973b3064a9ee41c",
+    "semantic_hash": ""
+  },
+  "tests/unit/test_propagators.py": {
+    "mtime": 1784561688.9691067,
+    "ast_hash": "8aeed9dc906590b534c0723d802362fb",
     "semantic_hash": ""
   }
 }

@@ -1,16 +1,16 @@
 # Graph Report - BEPI  (2026-07-20)
 
 ## Corpus Check
-- 143 files · ~136,735 words
+- 147 files · ~149,016 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1337 nodes · 2773 edges · 84 communities (82 shown, 2 thin omitted)
-- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 713 edges (avg confidence: 0.68)
+- 1462 nodes · 3112 edges · 88 communities (85 shown, 3 thin omitted)
+- Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 803 edges (avg confidence: 0.69)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `92049b28`
+- Built from commit: `66f5b23b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -59,6 +59,7 @@
 - Cluster 41
 - Cluster 42
 - Cluster 43
+- analyze
 - Cluster 45
 - Cluster 46
 - Cluster 47
@@ -74,25 +75,28 @@
 - LL-001 — Hubble, aberrazione sferica
 - LL-002 — Mars Climate Orbiter, mismatch di unità
 - ECSS corpus — knowledge layer (docs-as-code)
+- OrbitSpec
 - page_team
 - seed_demo_mission.py
 - test_risk_loading.py
+- validation.py
+- test_boot_mock.py
 
 ## God Nodes (most connected - your core abstractions)
 1. `page_integrations()` - 103 edges
 2. `get_supabase()` - 47 edges
 3. `get_body()` - 34 edges
-4. `page_reports()` - 21 edges
-5. `Supabase PostgreSQL` - 21 edges
-6. `Base` - 19 edges
-7. `get_service_client()` - 19 edges
-8. `TimestampMixin` - 18 edges
-9. `UUIDMixin` - 18 edges
-10. `ProductNode` - 18 edges
+4. `analyze()` - 29 edges
+5. `OrbitSpec` - 24 edges
+6. `page_reports()` - 21 edges
+7. `Supabase PostgreSQL` - 21 edges
+8. `Base` - 19 edges
+9. `get_service_client()` - 19 edges
+10. `TimestampMixin` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `page_integrations()` --calls--> `body_names()`  [INFERRED]
-  streamlit_app.py → src/bepi/integrations/celestial_bodies.py
+- `test_two_body_period_closure()` --calls--> `OrbitSpec`  [INFERRED]
+  tests/unit/test_mission_sim.py → src/bepi/integrations/mission_sim.py
 - `page_integrations()` --calls--> `LCAItem`  [INFERRED]
   streamlit_app.py → src/bepi/integrations/openlca_export.py
 - `page_integrations()` --calls--> `has_spacepy()`  [INFERRED]
@@ -114,35 +118,35 @@
 - **Supabase schema: core tables (CLAUDE.md list)** — table-missions, table-requirements, table-risks, table-tasks, table-product-tree-nodes, table-equip-budgets, table-approval-log, table-email-queue, table-team-members, table-warehouse-items, table-procurement-orders [EXTRACTED]
 - **DevOps configuration files** — requirements-txt, requirements-dev-txt, github_workflows_ci_workflow, docker-compose [EXTRACTED]
 
-## Communities (84 total, 2 thin omitted)
+## Communities (88 total, 3 thin omitted)
 
 ### Community 0 - "Celestial Bodies Data"
-Cohesion: 0.12
-Nodes (21): Any, _circular_velocity(), compute_phase_delta_v(), generate_phase_summary_table(), _helio_radius(), _hohmann_delta_v(), MissionPhase, MissionProfile (+13 more)
+Cohesion: 0.07
+Nodes (62): Any, CelestialBody, get_body(), _force_model(), generate_maneuver_script(), generate_propagation_script(), generate_stationkeeping_script(), FreeFlyer script generation — creates .MissionPlan files from BEPI parameters. (+54 more)
 
 ### Community 1 - "Risks API (FMECA/FTA)"
 Cohesion: 0.06
-Nodes (86): DeclarativeBase, FastAPI, bulk_import_requirements(), coverage_report(), create_requirement(), delete_requirement(), get_requirement(), get_requirement_trace() (+78 more)
+Nodes (70): DeclarativeBase, FastAPI, bulk_import_requirements(), coverage_report(), create_requirement(), delete_requirement(), get_requirement(), get_requirement_trace() (+62 more)
 
 ### Community 2 - "Requirements API"
-Cohesion: 0.06
-Nodes (96): budget_rollup(), budget_summary(), _build_rollup_node(), create_allocation(), create_limit(), delete_allocation(), delete_limit(), get_allocation() (+88 more)
+Cohesion: 0.09
+Nodes (68): create_node(), create_operating_mode(), delete_node(), delete_operating_mode(), get_node(), get_node_tree(), get_operating_mode(), list_nodes() (+60 more)
 
 ### Community 3 - "Debris & Atmospheric Risk"
 Cohesion: 0.08
 Nodes (42): _atmospheric_density(), BreakupResult, BreakupType, CasualtyRiskResult, check_debris_compliance(), CollisionResult, ComplianceItem, ComplianceReport (+34 more)
 
 ### Community 4 - "Product Tree API"
-Cohesion: 0.19
-Nodes (22): body_names(), CelestialBody, get_body(), _body_traces(), _ground_track_flat(), _ground_track_geo(), _keplerian_orbit(), _load_earth_texture() (+14 more)
+Cohesion: 0.20
+Nodes (28): budget_rollup(), budget_summary(), _build_rollup_node(), create_allocation(), create_limit(), delete_allocation(), delete_limit(), get_allocation() (+20 more)
 
 ### Community 5 - "Risk Services (FMECA, FTA)"
 Cohesion: 0.08
 Nodes (22): compute_criticality(), compute_fta_probability(), FaultTreeNodeData, fmeca_ranking(), FMECAEntryData, Risk management: risk register, FMECA, FTA., ECSS-Q-ST-30 criticality classification.     Cat 1: Catastrophic (sev 5, occ >=, Recursively compute top event probability.     AND gate: P = product of children (+14 more)
 
 ### Community 6 - "Budget Allocation & Rollup"
-Cohesion: 0.07
-Nodes (34): budget_summary(), compute_value_with_margins(), get_component_margin(), get_system_margin(), ECSS margin policy tables from ECSS-E-HB-10-02., Compute value with component and optionally system margins.      Returns dict wi, _resolve_phase(), BudgetAllocationData (+26 more)
+Cohesion: 0.08
+Nodes (33): budget_summary(), compute_value_with_margins(), get_component_margin(), get_system_margin(), ECSS margin policy tables from ECSS-E-HB-10-02., Compute value with component and optionally system margins.      Returns dict wi, _resolve_phase(), BudgetAllocationData (+25 more)
 
 ### Community 7 - "Radiation Export Models"
 Cohesion: 0.11
@@ -153,12 +157,12 @@ Cohesion: 0.26
 Nodes (11): create_mission(), delete_mission(), get_mission(), list_missions(), AsyncSession, update_mission(), Mission, MissionCreate (+3 more)
 
 ### Community 9 - "Budgets API"
-Cohesion: 0.23
-Nodes (20): _force_model(), generate_maneuver_script(), generate_propagation_script(), generate_stationkeeping_script(), FreeFlyer script generation — creates .MissionPlan files from BEPI parameters., _coord_system(), _force_model_block(), generate_maneuver_script() (+12 more)
+Cohesion: 0.11
+Nodes (24): atmosphere_density(), _atmosphere_density_arr(), estimate_lifetime(), _mean_decay_rate_km_s(), Atmospheric density [kg/m^3] at altitude h_km (Vallado Table 8-4     piecewise-e, Vectorized atmosphere_density for (N,) altitude arrays., Orbit-averaged SMA decay rate [km/s] from atmospheric drag.      e = 0: classica, Coarse orbital-lifetime estimate [years], or None past max_years.      Integrate (+16 more)
 
 ### Community 10 - "Demo Mission Seeder"
-Cohesion: 0.12
-Nodes (21): date, _as_date(), compute_cpm(), CPMResult, gantt_data(), infer_predecessors_from_dates(), project_start_from_tasks(), Scheduling: WBS, Gantt, CPM/PERT. (+13 more)
+Cohesion: 0.07
+Nodes (34): date, build_demo_product_tree(), build_demo_requirements(), build_demo_risks(), build_demo_tasks(), main(), ~15 tasks spanning 18 months., Build complete product tree for BEPI-SAT. (+26 more)
 
 ### Community 11 - "NASA NAC/RAC Radiation"
 Cohesion: 0.12
@@ -166,19 +170,19 @@ Nodes (30): int, compute_ms(), compute_nacrac(), compute_rc(), compute_ri(), MSP
 
 ### Community 12 - "DB Writer (mutations)"
 Cohesion: 0.13
-Nodes (26): add_fmeca_entry(), add_product_node(), add_requirement(), add_risk(), add_task(), _clean_updates(), delete_fmeca_entry(), delete_mission() (+18 more)
+Nodes (27): add_fmeca_entry(), add_mission(), add_mission_member(), add_product_node(), add_requirement(), add_risk(), add_task(), _clean_updates() (+19 more)
 
 ### Community 13 - "DAS/DRAMA/MASTER Importer"
 Cohesion: 0.14
 Nodes (22): _detect_separator(), import_das_xml(), import_drama_output(), import_master_dat(), _is_numeric(), Importers for DAS, DRAMA and MASTER output files., _try_float(), detect_and_import() (+14 more)
 
 ### Community 14 - "Mock Data (offline)"
-Cohesion: 0.14
-Nodes (21): _code_by_id(), _compute_criticality(), FMECAEntryData, mock_fmeca(), mock_product_tree_flat(), mock_requirements(), mock_risks(), mock_tasks() (+13 more)
+Cohesion: 0.17
+Nodes (15): _code_by_id(), _compute_criticality(), FMECAEntryData, mock_fmeca(), mock_product_tree_flat(), mock_requirements(), mock_risks(), mock_tasks() (+7 more)
 
 ### Community 15 - "Onboarding & Mission Helpers"
-Cohesion: 0.12
-Nodes (28): get_framework(), _base_context(), _build_budget_tree(), _default_operating_mode(), _ecss_lessons_tab(), _get_equip_budgets(), _get_operating_modes(), _get_product_tree() (+20 more)
+Cohesion: 0.05
+Nodes (90): get_framework(), _default_mission_data(), can(), can_edit_node(), can_modify_product_tree(), _current_role(), _current_user(), _node_subsystem() (+82 more)
 
 ### Community 16 - "Requirements Services"
 Cohesion: 0.13
@@ -189,28 +193,28 @@ Cohesion: 0.11
 Nodes (18): mission_create(), _render_tree(), tree_show(), build_tree(), compute_wbs_codes(), find_node(), flatten_tree(), generate_node_code() (+10 more)
 
 ### Community 18 - "Onboarding Flow (loaders)"
-Cohesion: 0.14
-Nodes (25): load_missions_for_user(), add_mission(), add_mission_member(), _orbit_type_from_altitude(), _check_invitation(), check_onboarding_needed(), _create_invitation(), _finalize_onboarding() (+17 more)
+Cohesion: 0.19
+Nodes (18): load_missions_for_user(), _check_invitation(), check_onboarding_needed(), _create_invitation(), _generate_invite_code(), _load_user_missions(), Full-screen onboarding wizard for new users., Membership rows for the user, or None if the check could not run.      None (DB (+10 more)
 
 ### Community 19 - "Thermal Model (ESATAN)"
-Cohesion: 0.11
-Nodes (20): _default_mission_data(), _default_mission_data(), _ecss_can_edit(), _ecss_deliverables_tab(), get_effective_risks(), _get_mock_team(), _map_mission(), _mission_from_db_row() (+12 more)
+Cohesion: 0.14
+Nodes (22): datetime, _as_utc(), _build_checks(), CheckResult, fspl_db(), gmst_rad(), _jd(), _link_result() (+14 more)
 
 ### Community 20 - "Launch Vehicle Capability"
 Cohesion: 0.14
 Nodes (20): _build_vehicles(), c3_capability(), escape_velocity(), launch_window_geometry(), LaunchVehicle, _make_c3_curve(), OrbitType, plot_c3_curves() (+12 more)
 
 ### Community 21 - "Station Keeping & Propellant"
-Cohesion: 0.09
-Nodes (27): compute_propellant_mass(), _density_at_altitude(), _orbital_period(), _orbital_velocity(), Station-keeping and delta-V budget tool for orbital missions., Atmospheric drag compensation ΔV for LEO.      Uses exponential atmosphere model, GEO station-keeping ΔV (N-S + E-W).      N-S: ~50 m/s/yr (luni-solar inclination, Sun-synchronous orbit RAAN maintenance ΔV.      J2 secular drift naturally maint (+19 more)
+Cohesion: 0.12
+Nodes (20): compute_propellant_mass(), _density_at_altitude(), _orbital_period(), _orbital_velocity(), Station-keeping and delta-V budget tool for orbital missions., Atmospheric drag compensation ΔV for LEO.      Uses exponential atmosphere model, GEO station-keeping ΔV (N-S + E-W).      N-S: ~50 m/s/yr (luni-solar inclination, Sun-synchronous orbit RAAN maintenance ΔV.      J2 secular drift naturally maint (+12 more)
 
 ### Community 22 - "SPICE Kernels (NAIF)"
 Cohesion: 0.20
 Nodes (17): BodyDef, _circle_boundary_vectors(), generate_all_kernels(), generate_ck_comment(), generate_dsk_input(), generate_fk(), generate_ik(), generate_mk() (+9 more)
 
 ### Community 23 - "Satellite 3D Model"
-Cohesion: 0.09
-Nodes (51): Cone, solar_flux_at_body(), _add_antenna_realistic(), _add_bus_mesh(), _add_panels(), _add_radiator(), _add_subsystem_blocks(), _add_thermal_nodes_markers() (+43 more)
+Cohesion: 0.17
+Nodes (24): _add_antenna_realistic(), _add_bus_mesh(), _add_panels(), _add_radiator(), _add_subsystem_blocks(), _add_thermal_nodes_markers(), _box_faces(), create_face_to_node_mapping() (+16 more)
 
 ### Community 24 - "Audit Decisions & Schema"
 Cohesion: 0.19
@@ -218,19 +222,19 @@ Nodes (16): I1: Schema SQL rigenerato, P2: Cache client Supabase, S2: Edge Funct
 
 ### Community 25 - "Misc Utilities (cone, etc.)"
 Cohesion: 0.28
-Nodes (15): interplanetary_data(), plot_interplanetary(), BatterySizing, compute_battery_sizing(), compute_eclipse_fraction(), compute_power_budget_balance(), compute_solar_power_profile(), export_systema_power_csv() (+7 more)
+Nodes (12): BatterySizing, compute_battery_sizing(), compute_eclipse_fraction(), compute_power_budget_balance(), compute_solar_power_profile(), export_systema_power_csv(), _orbit_period_min(), OrbitLightingParams (+4 more)
 
 ### Community 26 - "Product Tree UI (Streamlit)"
 Cohesion: 0.08
 Nodes (23): 1. Introduzione, 2. Documenti applicabili e di riferimento, 3.1 Obiettivi e vincoli di progetto, 3.2 Logica di evoluzione del prodotto, 3.3 Fasi, review e pianificazione, 3.4 Approccio all'approvvigionamento, 3.5 Criticità iniziali, 3. Project overview (+15 more)
 
 ### Community 27 - "Bug & Audit Log (deferred)"
-Cohesion: 0.16
-Nodes (14): C1/C3: Rimozione codice morto, Bug aperti (deliberato), I2: CI workflow, S6: check_password() gate, Bug: Logout/perdita dati dopo ~1h, Comandi locali, docker-compose (PostgreSQL locale), GitHub Actions CI (+6 more)
+Cohesion: 0.13
+Nodes (18): C1/C3: Rimozione codice morto, Bug aperti (deliberato), I2: CI workflow, S6: check_password() gate, Bug: Logout/perdita dati dopo ~1h, Comandi locali, docker-compose (PostgreSQL locale), GitHub Actions CI (+10 more)
 
 ### Community 28 - "Environment Constants"
-Cohesion: 0.16
-Nodes (26): Environment, _auto_width(), export_mission(), export_product_tree(), export_requirements(), export_risks(), export_schedule(), import_product_tree_from_excel() (+18 more)
+Cohesion: 0.24
+Nodes (13): Environment, _build_docx_programmatically(), compile_pdf(), _escape_dict(), _escape_latex(), generate_docx_report(), generate_report(), _latex_env() (+5 more)
 
 ### Community 29 - "Excel I/O Services"
 Cohesion: 0.10
@@ -265,8 +269,8 @@ Cohesion: 0.13
 Nodes (5): fake(), FakeClient, _Query, gates.py against an in-memory fake Supabase client (no live DB needed)., _Resp
 
 ### Community 37 - "Cluster 37"
-Cohesion: 0.20
-Nodes (10): scripts/check_streamlit_structure.py, streamlit/_badges.py, streamlit/_bootstrap.py, streamlit/_layout.py, streamlit/_mission.py, streamlit/_mock_data.py, streamlit/pages/, streamlit/_settings.py (+2 more)
+Cohesion: 0.15
+Nodes (14): scripts/check_streamlit_structure.py, streamlit/_badges.py, streamlit/_bootstrap.py, streamlit/_layout.py, streamlit/_loaders.py, streamlit/_mission.py, streamlit/_mock_data.py, streamlit/pages/ (+6 more)
 
 ### Community 38 - "Cluster 38"
 Cohesion: 0.36
@@ -277,8 +281,8 @@ Cohesion: 0.36
 Nodes (9): apply_outputs(), ParamMapping, prepare_inputs(), MATLAB/Octave bridge — execute scripts with parameter mapping., _resolve_engine(), run_script(), RunResult, ScriptConfig (+1 more)
 
 ### Community 40 - "Cluster 40"
-Cohesion: 0.14
-Nodes (15): P1: Cache product tree, S1: Ruolo default onboarding, bepi.services, Bug: Duplicati budget (Edit Equipment), Remember.md Snapshot 2026-06-20, RBAC 8 ruoli, streamlit/_loaders.py, streamlit/_pt_actions.py (+7 more)
+Cohesion: 0.20
+Nodes (10): P1: Cache product tree, S1: Ruolo default onboarding, bepi.services, Bug: Duplicati budget (Edit Equipment), Remember.md Snapshot 2026-06-20, RBAC 8 ruoli, TODO: DB Budget Edit Equipment (RISOLTO), TODO: Cookie SSO (NON IMPLEMENTATO) (+2 more)
 
 ### Community 41 - "Cluster 41"
 Cohesion: 0.12
@@ -291,6 +295,10 @@ Nodes (15): 1. L'idea e l'obiettivo, 2. Le idee emerse e la scrematura, 3. La li
 ### Community 43 - "Cluster 43"
 Cohesion: 0.20
 Nodes (15): _client(), ensure_review(), excluded_requirements(), initialise_gate(), load_review_gates(), load_tailoring(), Per-mission ECSS project data: review gates, deliverable status, tailoring.  Thi, Return the stored tailoring object: {product_type, decisions:[{req,decision,rati (+7 more)
+
+### Community 44 - "analyze"
+Cohesion: 0.16
+Nodes (22): analyze(), _apply_parameter(), _extract_measure(), MissionResult, MissionSpec, _parameter_base(), PassEvent, Re-run the analysis over a range of one parameter. Returns [(value, measure)]. (+14 more)
 
 ### Community 45 - "Cluster 45"
 Cohesion: 0.25
@@ -309,8 +317,8 @@ Cohesion: 0.14
 Nodes (6): BEPI Architecture, bepi.core, bepi.ecss, BEPI Platform, Roadmap Fasi BEPI, Setup Claude Code per Matteo
 
 ### Community 49 - "Cluster 49"
-Cohesion: 0.33
-Nodes (6): bepi.integrations, Report Sicurezza, streamlit/pages/integrations/, Vuln Media: Command injection matlab_bridge, Vuln Critica: Esposizione credenziali, Vuln Media: XSS potenziale in streamlit_app.py
+Cohesion: 0.16
+Nodes (15): bepi.integrations, loads_from_equipment(), LoadSpec, Map equipment rows ({"name", "power_w", "qty"}) to always-on LoadSpecs.      pow, streamlit/pages/integrations/, albasat_result(), albasat_spec(), Regression tests for bepi.integrations.mission_sim.  Expected values are REFEREN (+7 more)
 
 ### Community 50 - "Cluster 50"
 Cohesion: 0.40
@@ -321,16 +329,16 @@ Cohesion: 0.50
 Nodes (4): print_summary(), Print a summary of all ECSS seed data., Seed ECSS data into PostgreSQL (async).     Requires running PostgreSQL and conf, seed_db()
 
 ### Community 52 - "Cluster 52"
-Cohesion: 0.60
-Nodes (3): aggregate(), AggregatedOutput, PhaseOutput
+Cohesion: 0.19
+Nodes (13): Cone, body_names(), solar_flux_at_body(), interplanetary_data(), plot_interplanetary(), aggregate(), AggregatedOutput, PhaseOutput (+5 more)
 
 ### Community 77 - "Punti di decisione per tipo di prodotto"
 Cohesion: 0.22
 Nodes (8): Il dato che conta: quanti punti decisionali hai, Launch segment element/sub-system — 44 decisioni, Launch segment equipment — 19 decisioni, Matrice completa (Table 7-2), Matrice di pre-tailoring — ECSS-E-ST-10C Rev.1, Punti di decisione per tipo di prodotto, Space segment element/sub-system — 15 decisioni, Space segment equipment — 66 decisioni
 
 ### Community 78 - "seed_demo_mission"
-Cohesion: 0.40
-Nodes (10): can(), can_edit_node(), can_modify_product_tree(), _current_role(), _current_user(), _node_subsystem(), require(), _ecss_tailoring_tab() (+2 more)
+Cohesion: 0.23
+Nodes (21): _build_coupling_map(), compute_eclipse_fraction_from_beta(), _effective_props(), EnvironmentFluxes, export_esatan_input(), export_systema_thermal_csv(), heater_sizing(), plot_thermal_map() (+13 more)
 
 ### Community 79 - "LL-001 — Hubble, aberrazione sferica"
 Cohesion: 0.33
@@ -344,37 +352,45 @@ Nodes (5): Aggancio al deliverable, Catena causale, Fonte, LL-002 — Mars Clima
 Cohesion: 0.33
 Nodes (5): Aggiornare a una nuova revisione, Come arriva in BEPI (build → app), Cosa c'è qui, ECSS corpus — knowledge layer (docs-as-code), Versioning (ECSS invecchia)
 
+### Community 82 - "OrbitSpec"
+Cohesion: 0.20
+Nodes (18): BatterySpec, GroundStationSpec, OrbitSpec, Walker delta T/P/F constellation built from a template satellite., SatelliteSpec, walker_delta(), page_mission_analysis(), Phase A/B parametric mission analysis (self-contained, session-only). (+10 more)
+
 ### Community 83 - "page_team"
-Cohesion: 0.28
-Nodes (13): colored_header(), get_approval_log(), get_latest_approval(), get_member(), get_req_ownership(), get_requirements(), get_task_assignments(), get_team() (+5 more)
+Cohesion: 0.16
+Nodes (18): _body_axes(), _elements_rv(), _mean_anomaly0(), _normalize_rows(), _propagate(), _propagate_j2_drag(), _propagate_sgp4(), ndarray (+10 more)
 
 ### Community 84 - "seed_demo_mission.py"
-Cohesion: 0.33
-Nodes (8): build_demo_product_tree(), build_demo_requirements(), build_demo_risks(), build_demo_tasks(), main(), ~15 tasks spanning 18 months., Build complete product tree for BEPI-SAT., ~30 requirements on 4 levels.
+Cohesion: 0.44
+Nodes (16): DependencyType, MilestoneStatus, TaskStatus, CPMResponse, CPMTaskResult, GanttResponse, GanttTask, MilestoneCreate (+8 more)
 
 ### Community 85 - "test_risk_loading.py"
-Cohesion: 0.48
-Nodes (6): _load(), Regression: entities loaded from the DB must be the services/ dataclasses the ap, test_fmeca_maps_to_service_object(), test_requirement_maps_to_service_object_and_coverage_runs(), test_risk_maps_to_service_object(), test_task_maps_to_service_object_and_cpm_runs()
+Cohesion: 0.42
+Nodes (8): _code_by_id(), _criticality(), _model_data(), _risk_level(), _sample(), _sample_product_tree(), seed_demo_mission(), _task_status()
+
+### Community 86 - "validation.py"
+Cohesion: 0.36
+Nodes (7): compare_internal_vs_imported(), DebrisBenchmark, _pct_deviation(), RadiationBenchmark, Benchmark validation for radiation and debris computations., validate_debris(), validate_radiation()
 
 ## Knowledge Gaps
 - **116 isolated node(s):** `RadiationEnvironment`, `DeepSpaceRadiation`, `RadiationBenchmark`, `DebrisBenchmark`, `ParamMapping` (+111 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `page_integrations()` connect `Misc Utilities (cone, etc.)` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Product Tree API`, `Cluster 38`, `Radiation Export Models`, `Budgets API`, `NASA NAC/RAC Radiation`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Thermal Model (ESATAN)`, `Launch Vehicle Capability`, `Cluster 52`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `Station Keeping & Propellant`, `page_team`?**
-  _High betweenness centrality (0.424) - this node is a cross-community bridge._
-- **Why does `bepi.ecss` connect `Cluster 48` to `Thermal Model (ESATAN)`, `Cluster 43`, `Cluster 36`?**
-  _High betweenness centrality (0.213) - this node is a cross-community bridge._
-- **Why does `budget_summary()` connect `Budget Allocation & Rollup` to `CLI (bepi.cli)`, `Requirements API`?**
-  _High betweenness centrality (0.123) - this node is a cross-community bridge._
+- **Why does `page_integrations()` connect `Cluster 52` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Cluster 38`, `Radiation Export Models`, `NASA NAC/RAC Radiation`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Onboarding & Mission Helpers`, `seed_demo_mission`, `Launch Vehicle Capability`, `Station Keeping & Propellant`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `validation.py`, `Misc Utilities (cone, etc.)`?**
+  _High betweenness centrality (0.291) - this node is a cross-community bridge._
+- **Why does `bepi.ecss` connect `Cluster 48` to `Cluster 43`, `Cluster 36`, `Onboarding & Mission Helpers`?**
+  _High betweenness centrality (0.089) - this node is a cross-community bridge._
+- **Why does `BEPI Architecture` connect `Cluster 48` to `Cluster 40`, `Cluster 49`, `Bug & Audit Log (deferred)`, `Audit Decisions & Schema`?**
+  _High betweenness centrality (0.077) - this node is a cross-community bridge._
 - **Are the 101 inferred relationships involving `page_integrations()` (e.g. with `streamlit_app.py` and `body_names()`) actually correct?**
   _`page_integrations()` has 101 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 44 inferred relationships involving `get_supabase()` (e.g. with `logout()` and `render_auth_ui()`) actually correct?**
   _`get_supabase()` has 44 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 12 inferred relationships involving `page_reports()` (e.g. with `streamlit_app.py` and `get_component_margin()`) actually correct?**
-  _`page_reports()` has 12 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `RadiationEnvironment`, `DeepSpaceRadiation`, `RadiationBenchmark` to the rest of the system?**
-  _116 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Are the 4 inferred relationships involving `datetime` (e.g. with `generate_ck_comment()` and `generate_spk_comment()`) actually correct?**
+  _`datetime` has 4 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 14 inferred relationships involving `analyze()` (e.g. with `page_mission_analysis()` and `albasat_result()`) actually correct?**
+  _`analyze()` has 14 INFERRED edges - model-reasoned connections that need verification._

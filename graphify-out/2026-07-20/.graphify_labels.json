@@ -43,6 +43,7 @@
   "41": "Cluster 41",
   "42": "Cluster 42",
   "43": "Cluster 43",
+  "44": "analyze",
   "45": "Cluster 45",
   "46": "Cluster 46",
   "47": "Cluster 47",
@@ -80,7 +81,10 @@
   "79": "LL-001 — Hubble, aberrazione sferica",
   "80": "LL-002 — Mars Climate Orbiter, mismatch di unità",
   "81": "ECSS corpus — knowledge layer (docs-as-code)",
+  "82": "OrbitSpec",
   "83": "page_team",
   "84": "seed_demo_mission.py",
-  "85": "test_risk_loading.py"
+  "85": "test_risk_loading.py",
+  "86": "validation.py",
+  "87": "test_boot_mock.py"
 }

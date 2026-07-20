@@ -59,6 +59,7 @@ from bepi.onboarding import check_onboarding_needed, render_onboarding, _load_us
 def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
     """Process product tree actions and save to DB."""
     from bepi.role_permissions import can
+    import logging as _pt_log
     
     client = get_service_client() or get_supabase()
     mission_id = st.session_state.get("active_mission_id")
@@ -138,6 +139,117 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
         if target_id:
             st.session_state["_pt_edit_target_id"] = str(target_id)
             st.session_state["_pt_active"] = "edit"
+        st.rerun()
+
+    elif action == "save_budget":
+        # Save the inline expand editor (Budget view) directly. We do
+        # the same DB writes as `_pt_render_edit`'s Save Changes button
+        # — mass row + per-mode power rows + product_tree_nodes fields
+        # — but in one round trip from the iframe, no dialog needed.
+        if _role == "ADMIN" or can("edit_budget") or can("edit_subsystem"):
+            target_id = str(data.get("id") or "")
+            if not target_id:
+                _pt_log.warning("save_budget: missing id")
+            else:
+                new_code = str(data.get("code") or "").strip()
+                new_name = str(data.get("name") or "").strip()
+                new_level = str(data.get("level") or "equipment")
+                new_parent = data.get("parent_id") or None
+                new_trl = int(data.get("trl") or 5)
+                new_qty = int(data.get("qty") or 1)
+                new_mass = float(data.get("mass") or 0.0)
+                new_mat = str(data.get("maturity") or "estimate")
+                power_by_mode_in = data.get("power_by_mode") or {}
+
+                if not new_code or not new_name:
+                    st.error("Code and Name are required.")
+                else:
+                    default_mode = _default_operating_mode()
+                    # Update in-memory caches so the rest of the app sees
+                    # the new values immediately.
+                    old_node = next(
+                        (n for n in st.session_state.get("product_tree", [])
+                         if str(n.get("id")) == target_id or str(n.get("uuid")) == target_id),
+                        None,
+                    )
+                    if old_node is not None:
+                        old_node["name"] = new_name
+                        old_node["code"] = new_code
+                        old_node["level"] = new_level
+                        old_node["parent_id"] = new_parent
+                        old_node["trl"] = new_trl
+                        old_node["quantity"] = new_qty
+                    # Mirror into equip_budgets cache (keyed by code).
+                    eb[new_code] = {
+                        "mass": new_mass,
+                        "power": float(
+                            power_by_mode_in.get(str(default_mode.get("id", "")), 0.0)
+                            or 0.0
+                        ),
+                        "power_by_mode": {
+                            str(mid): float(v) for mid, v in power_by_mode_in.items()
+                        },
+                        "qty": new_qty,
+                        "mat": new_mat,
+                        "trl": new_trl,
+                    }
+
+                    if client:
+                        try:
+                            # 1. product_tree_nodes row.
+                            client.table("product_tree_nodes").update({
+                                "name": new_name,
+                                "code": new_code,
+                                "level": new_level,
+                                "parent_id": new_parent,
+                                "trl": new_trl,
+                                "quantity": new_qty,
+                            }).eq("id", target_id).execute()
+
+                            # 2. Mass row (mode-independent, operating_mode_id IS NULL).
+                            res = client.table("budgets").update({
+                                "nominal_value": new_mass,
+                                "quantity": new_qty,
+                                "maturity": new_mat,
+                            }).eq("node_id", target_id).eq("budget_type", "mass_kg").is_(
+                                "operating_mode_id", "null"
+                            ).execute()
+                            if not res.data:
+                                client.table("budgets").insert({
+                                    "node_id": target_id,
+                                    "budget_type": "mass_kg",
+                                    "nominal_value": new_mass,
+                                    "unit": "kg",
+                                    "quantity": new_qty,
+                                    "maturity": new_mat,
+                                    "source": "budget_inline_editor",
+                                }).execute()
+
+                            # 3. One power row per operating mode.
+                            for mid, power_w in power_by_mode_in.items():
+                                res = client.table("budgets").update({
+                                    "nominal_value": float(power_w),
+                                    "quantity": new_qty,
+                                    "maturity": new_mat,
+                                }).eq("node_id", target_id).eq(
+                                    "budget_type", "power_w"
+                                ).eq("operating_mode_id", str(mid)).execute()
+                                if not res.data:
+                                    client.table("budgets").insert({
+                                        "node_id": target_id,
+                                        "budget_type": "power_w",
+                                        "operating_mode_id": str(mid),
+                                        "nominal_value": float(power_w),
+                                        "unit": "W",
+                                        "quantity": new_qty,
+                                        "maturity": new_mat,
+                                        "source": "budget_inline_editor",
+                                    }).execute()
+
+                            st.session_state.pop("equip_budgets", None)
+                            st.success(f"✅ Saved {new_code}.")
+                        except Exception as e:
+                            st.error(f"Save Budget Error: {e}")
         st.rerun()
 
     elif action == "update_item":
@@ -2800,11 +2912,87 @@ def page_product_tree():
     font-family: inherit;
   }
 
-  /* Budget view: clickable rows, read-only summary + per-mode totals */
+  /* Budget view: clickable rows, inline expand editor */
   tr.budget-row { cursor: pointer; transition: background 0.15s; }
   tr.budget-row:hover { background: rgba(88,166,255,0.06); }
+  tr.budget-row.open { background: rgba(63,185,80,0.06); }
   tr.budget-row td:last-child { color: var(--blue); opacity: 0.6; }
-  tr.budget-row:hover td:last-child { opacity: 1; }
+  tr.budget-row:hover td:last-child,
+  tr.budget-row.open td:last-child { opacity: 1; }
+
+  tr.budget-detail { background: rgba(13,17,23,0.5); }
+  tr.budget-detail td { padding: 0 !important; }
+  .budget-detail-inner {
+    padding: 20px 28px 24px;
+    border-top: 1px solid var(--emerald-border);
+    border-bottom: 1px solid var(--emerald-border);
+    background: linear-gradient(180deg, rgba(63,185,80,0.06) 0%, rgba(13,17,23,0.2) 100%);
+  }
+  .budget-detail-header {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--emerald);
+  }
+  .budget-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px 16px;
+    margin-top: 12px;
+  }
+  .budget-edit-field { display: flex; flex-direction: column; gap: 4px; }
+  .budget-edit-field label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-muted);
+  }
+  .budget-edit-field input,
+  .budget-edit-field select,
+  .budget-mode-row input {
+    background: rgba(13,17,23,0.7);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .budget-edit-field input:focus,
+  .budget-edit-field select:focus,
+  .budget-mode-row input:focus { border-color: var(--emerald); }
+  .budget-edit-modes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px 16px;
+  }
+  .budget-mode-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .budget-mode-row label {
+    flex: 0 0 100px;
+    font-size: 11px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .budget-mode-row input { flex: 1; }
+  .budget-detail-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 18px;
+  }
+  .budget-btn-save, .budget-btn-cancel {
+    border: none; border-radius: 8px;
+    padding: 8px 18px; font-size: 12px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.04em;
+    transition: all 0.15s; font-family: inherit;
+  }
+  .budget-btn-save {
+    background: var(--emerald); color: #0d1117;
+  }
+  .budget-btn-save:hover { background: #4ec964; transform: translateY(-1px); }
+  .budget-btn-cancel {
+    background: transparent; color: var(--text-muted);
+    border: 1px solid var(--border-light);
+  }
+  .budget-btn-cancel:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
   .maturity-pill {
     display: inline-block; padding: 3px 8px; border-radius: 6px;
@@ -3034,19 +3222,16 @@ let items = __INJECT_ITEMS_HERE__;
 let operatingModes = __INJECT_MODES_HERE__; // [{id, name}, ...]
 
 function triggerStreamlit(action, data) {
-    // Row-click → open the Edit dialog. The only reliable way to
-    // reach the Streamlit script from this srcdoc iframe is top-frame
-    // navigation: we set `window.parent.location.href` to the current
-    // page with a `pt_action=open_edit` query param. Streamlit picks
-    // it up on the next rerun, dispatches via
-    // `_process_product_tree_action`, which sets `_pt_active="edit"`
-    // and `_pt_edit_target_id`, and the existing `_pt_render_edit`
-    // dialog opens.
+    // Top-frame navigation is the only reliable way to reach the
+    // Streamlit script from this srcdoc iframe. We route two actions
+    // through it:
+    //   - open_edit_dialog: row click → open the existing _pt_render_edit
+    //     dialog (used by the Tree and Table views)
+    //   - save_budget: Save Changes inside the Budget view's inline
+    //     expander → write the edited values back to the DB
     if (action === "open_edit_dialog" && data && data.id) {
         try {
             const parent = window.parent;
-            // Preserve any other query params (mission selection, etc.)
-            // by reusing the current parent's URL as the base.
             const base = parent.location.pathname + parent.location.search;
             const sep = base.includes('?') ? '&' : '?';
             const payload = encodeURIComponent(JSON.stringify({ id: data.id }));
@@ -3054,6 +3239,19 @@ function triggerStreamlit(action, data) {
             parent.location.href = target;
         } catch (e) {
             console.error("[pt] top-frame navigation failed", e);
+        }
+        return;
+    }
+    if (action === "save_budget" && data && data.id) {
+        try {
+            const parent = window.parent;
+            const base = parent.location.pathname + parent.location.search;
+            const sep = base.includes('?') ? '&' : '?';
+            const payload = encodeURIComponent(JSON.stringify(data));
+            const target = base + sep + 'pt_action=save_budget&pt_data=' + payload;
+            parent.location.href = target;
+        } catch (e) {
+            console.error("[pt] save_budget navigation failed", e);
         }
         return;
     }
@@ -3182,26 +3380,41 @@ function renderTable() {
 }
 
 function renderBudget() {
-  // Read-only equipment table. Clicking a row navigates the top frame
-  // to open the existing _pt_render_edit dialog (where the user can
-  // change Mass, Qty, Maturity, TRL, Name, Level, Parent AND per-mode
-  // power with a real Save button — all wired through Streamlit
-  // session_state, not through the broken iframe → Python bridge).
   const equip = items.filter(i => i.level === 'equipment');
   const totalW = equip.reduce((s, it) => {
     const pbm = it.power_by_mode || {};
     return s + Object.values(pbm).reduce((a, v) => a + Number(v || 0), 0);
   }, 0);
-  let rows = equip.map(item => {
+
+  // Reusable list of "other nodes" for the parent dropdown (exclude self
+  // and descendants — moving a node under its own descendant would create
+  // a cycle). Built once per render.
+  function descendants(id) {
+    const out = new Set([String(id)]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const n of items) {
+        if (out.has(String(n.parentId)) && !out.has(String(n.id))) {
+          out.add(String(n.id));
+          changed = true;
+        }
+      }
+    }
+    return out;
+  }
+
+  const rows = equip.map(item => {
+    const isOpen = openEquipId === item.id;
     const itemTotal = Object.values(item.power_by_mode || {})
       .reduce((a, v) => a + Number(v || 0), 0);
-    // Per-mode power summary, comma-separated: "Op 18.0 W, Comm 35.0 W, …"
     const modeSummary = (operatingModes || []).map(m => {
       const v = (item.power_by_mode || {})[m.id] || 0;
       return `${m.name} <b>${Number(v).toFixed(1)} W</b>`;
     }).join(' &nbsp;·&nbsp; ');
-    return `
-      <tr class="budget-row" onclick="triggerStreamlit('open_edit_dialog', {id:'${item.id}'})" title="Click to edit">
+
+    let html = `
+      <tr class="budget-row ${isOpen ? 'open' : ''}" onclick="toggleEquipDetail('${item.id}')" title="Click to edit">
         <td class="cell-eq-code">${item.code}</td>
         <td style="font-weight:600;color:var(--text-primary)">${item.name}</td>
         <td>${Number(item.mass || 0).toFixed(2)}</td>
@@ -3210,8 +3423,97 @@ function renderBudget() {
         <td class="cell-trl">${item.trl}</td>
         <td style="font-size:12px;color:var(--text-secondary);min-width:280px;">${modeSummary || '<span style="color:var(--text-muted);">no modes</span>'}</td>
         <td style="text-align:right;font-weight:700;color:var(--emerald);">${itemTotal.toFixed(1)} W</td>
-        <td style="text-align:right;color:var(--text-muted);font-size:11px;width:90px;">click to edit →</td>
+        <td style="text-align:right;color:var(--blue);font-size:11px;width:90px;">${isOpen ? '▾ editing' : 'click to edit →'}</td>
       </tr>`;
+
+    if (isOpen) {
+      // Build the parent <select> options: every node except self + descendants.
+      const blocked = descendants(item.id);
+      const parentOptions = [
+        `<option value="" ${!item.parentId ? 'selected' : ''}>(root)</option>`,
+        ...items
+          .filter(n => !blocked.has(String(n.id)))
+          .map(n => {
+            const sel = String(n.id) === String(item.parentId) ? 'selected' : '';
+            return `<option value="${n.id}" ${sel}>${n.code} — ${n.name}</option>`;
+          })
+      ].join('');
+
+      // Per-mode power rows, one input per mode.
+      const modeRows = (operatingModes || []).map(m => {
+        const cur = (item.power_by_mode || {})[m.id] || 0;
+        return `
+          <div class="budget-mode-row">
+            <label>${m.name} (W)</label>
+            <input class="budget-input" type="number" min="0" step="0.5"
+                value="${cur}"
+                id="bp_${item.id}_${m.id}"/>
+          </div>`;
+      }).join('') || '<div style="color:var(--text-muted);font-size:12px;">No operating modes for this mission — add one in Settings → Operating Modes.</div>';
+
+      html += `
+        <tr class="budget-detail">
+          <td colspan="9" onclick="event.stopPropagation()">
+            <div class="budget-detail-inner">
+              <div class="budget-detail-header">
+                <span>Edit <b>${item.code}</b> — ${item.name}</span>
+                <span style="color:var(--text-muted);font-size:11px;">${item.level}</span>
+              </div>
+              <div class="budget-edit-grid">
+                <div class="budget-edit-field">
+                  <label>Name</label>
+                  <input type="text" value="${item.name}" id="bn_${item.id}"/>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Code</label>
+                  <input type="text" value="${item.code}" id="bc_${item.id}"/>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Level</label>
+                  <select id="bl_${item.id}">
+                    ${['satellite','subsystem','equipment','component'].map(l =>
+                      `<option value="${l}" ${l === item.level ? 'selected' : ''}>${l}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Parent</label>
+                  <select id="bpar_${item.id}">${parentOptions}</select>
+                </div>
+                <div class="budget-edit-field">
+                  <label>TRL</label>
+                  <input type="number" min="1" max="9" step="1" value="${item.trl || 5}" id="btrl_${item.id}"/>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Qty</label>
+                  <input type="number" min="1" step="1" value="${item.qty || 1}" id="bqty_${item.id}"/>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Mass (kg)</label>
+                  <input type="number" min="0" step="0.1" value="${item.mass || 0}" id="bmass_${item.id}"/>
+                </div>
+                <div class="budget-edit-field">
+                  <label>Maturity</label>
+                  <select id="bmat_${item.id}">
+                    ${['estimate','measured','qualified'].map(m =>
+                      `<option value="${m}" ${m === item.maturity ? 'selected' : ''}>${m}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="budget-edit-modes">
+                <div class="budget-detail-header" style="margin-top:18px;margin-bottom:10px;">
+                  <span>Per-mode power (W)</span>
+                </div>
+                ${modeRows}
+              </div>
+              <div class="budget-detail-actions">
+                <button class="budget-btn-cancel" onclick="toggleEquipDetail('${item.id}')">Cancel</button>
+                <button class="budget-btn-save" onclick="saveBudgetRow('${item.id}')">💾 Save changes</button>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+    }
+    return html;
   }).join('');
 
   document.getElementById('view-budget').innerHTML = `
@@ -3230,6 +3532,40 @@ function renderBudget() {
         </tr></tfoot>` : ''}
       </table>
     </div>`;
+}
+
+let openEquipId = null;
+function toggleEquipDetail(id) {
+  openEquipId = (openEquipId === id) ? null : id;
+  renderBudget();
+}
+
+function saveBudgetRow(equipId) {
+  // Collect every input from the expanded row, build the payload, and
+  // ship it to the Streamlit script via top-frame navigation. The
+  // Python side (action = "save_budget") upserts the budgets table.
+  const get = (suffix) => {
+    const el = document.getElementById(suffix + '_' + equipId);
+    return el ? el.value : null;
+  };
+  const powerByMode = {};
+  (operatingModes || []).forEach(m => {
+    const v = parseFloat(get('bp'));
+    powerByMode[String(m.id)] = isNaN(v) ? 0 : v;
+  });
+  const payload = {
+    id: equipId,
+    code: get('bc') || '',
+    name: get('bn') || '',
+    level: get('bl') || 'equipment',
+    parent_id: get('bpar') || null,
+    trl: parseInt(get('btrl') || '5', 10),
+    qty: parseInt(get('bqty') || '1', 10),
+    mass: parseFloat(get('bmass') || '0'),
+    maturity: get('bmat') || 'estimate',
+    power_by_mode: powerByMode,
+  };
+  triggerStreamlit('save_budget', payload);
 }
 
 // ── VIEW SWITCHING ──
