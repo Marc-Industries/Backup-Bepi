@@ -128,28 +128,31 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
         else:
             st.warning("You don't have permission to add components to the product tree.")
     
+    elif action == "open_edit":
+        # Triggered by clicking a row in the iframe Budget view. The
+        # iframe navigates the top frame with `?pt_action=open_edit&pt_data=...`
+        # (see `triggerStreamlit` in the JS template). We open the
+        # existing `_pt_render_edit` dialog, which already has the full
+        # per-mode power editor with a working Save button.
+        target_id = data.get("id")
+        if target_id:
+            st.session_state["_pt_edit_target_id"] = str(target_id)
+            st.session_state["_pt_active"] = "edit"
+        st.rerun()
+
     elif action == "update_item":
+        # Legacy path: kept for any direct setComponentValue callers
+        # that still post mass/maturity changes. The Budget-view iframe
+        # no longer fires this — it opens the full edit dialog via the
+        # `open_edit` action above, where the user edits per-mode power
+        # in one place and hits Save Changes.
         if _role == "ADMIN" or can("edit_budget") or can("edit_subsystem"):
             code = data.get("code")
             if code:
                 eb[code]["mass"] = float(data.get("mass", eb.get(code, {}).get("mass", 0)))
+                eb[code]["power"] = float(data.get("power", eb.get(code, {}).get("power", 0)))
                 default_mode = _default_operating_mode()
-                # Per-mode autosave from the Budget view: the JS sends
-                # {field:'power', mode:modeId, ...} so we know which row
-                # to upsert. Otherwise fall back to the legacy single
-                # power column (which maps to the default mode).
-                per_mode_update = (
-                    data.get("field") == "power" and data.get("mode")
-                )
-                if per_mode_update:
-                    target_mode_id = str(data["mode"])
-                    power_value = float(data.get("power", 0))
-                    eb[code].setdefault("power_by_mode", {})[target_mode_id] = power_value
-                    if target_mode_id == str(default_mode.get("id", "")):
-                        eb[code]["power"] = power_value
-                else:
-                    eb[code]["power"] = float(data.get("power", eb.get(code, {}).get("power", 0)))
-                    eb[code].setdefault("power_by_mode", {})[str(default_mode["id"])] = eb[code]["power"]
+                eb[code].setdefault("power_by_mode", {})[str(default_mode["id"])] = eb[code]["power"]
                 eb[code]["qty"] = int(data.get("qty", eb.get(code, {}).get("qty", 1)))
                 eb[code]["mat"] = data.get("maturity", eb.get(code, {}).get("mat", "estimate"))
                 eb[code]["trl"] = int(data.get("trl", eb.get(code, {}).get("trl", 1)))
@@ -173,32 +176,9 @@ def _process_product_tree_action(action: str, data: dict, flat: list, eb: dict):
                                                 "unit": unit,
                                                 "maturity": eb[code]["mat"],
                                             }).execute()
-                                    # Per-mode power upsert. When the JS
-                                    # sent a per-mode update we only
-                                    # touch that mode's row; otherwise we
-                                    # fall back to writing the default
-                                    # mode (legacy path).
-                                    target_modes = (
-                                        [str(data["mode"])] if per_mode_update
-                                        else [str(default_mode["id"])]
-                                    )
-                                    for mid in target_modes:
-                                        power_val = eb[code].get(
-                                            "power_by_mode", {}
-                                        ).get(mid, eb[code]["power"])
-                                        res = client.table("budgets").update({
-                                            "nominal_value": power_val,
-                                            "maturity": eb[code]["mat"],
-                                        }).eq("node_id", node_uuid).eq("budget_type", "power_w").eq("operating_mode_id", mid).execute()
-                                        if not res.data:
-                                            client.table("budgets").insert({
-                                                "node_id": node_uuid,
-                                                "budget_type": "power_w",
-                                                "operating_mode_id": mid,
-                                                "nominal_value": power_val,
-                                                "unit": "W",
-                                                "maturity": eb[code]["mat"],
-                                            }).execute()
+                                    res = client.table("budgets").update({"nominal_value": eb[code]["power"], "maturity": eb[code]["mat"]}).eq("node_id", node_uuid).eq("budget_type", "power_w").eq("operating_mode_id", default_mode["id"]).execute()
+                                    if not res.data:
+                                        client.table("budgets").insert({"node_id": node_uuid, "budget_type": "power_w", "operating_mode_id": default_mode["id"], "nominal_value": eb[code]["power"], "unit": "W", "maturity": eb[code]["mat"]}).execute()
                                 break
                     except Exception as e:
                         st.error(f"Update Error: {e}")
@@ -2788,37 +2768,20 @@ def page_product_tree():
     font-family: inherit;
   }
 
-  /* Budget view: clickable rows + per-mode expand panel */
+  /* Budget view: clickable rows, read-only summary + per-mode totals */
   tr.budget-row { cursor: pointer; transition: background 0.15s; }
-  tr.budget-row.open { background: rgba(63,185,80,0.05); }
-  tr.budget-row:hover { background: rgba(88,166,255,0.05); }
-  tr.budget-detail { background: rgba(13,17,23,0.4); }
-  tr.budget-detail td { padding: 0 !important; }
-  .budget-detail-inner {
-    padding: 20px 24px 24px 80px;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(63,185,80,0.04) 0%, rgba(13,17,23,0.0) 100%);
+  tr.budget-row:hover { background: rgba(88,166,255,0.06); }
+  tr.budget-row td:last-child { color: var(--blue); opacity: 0.6; }
+  tr.budget-row:hover td:last-child { opacity: 1; }
+
+  .maturity-pill {
+    display: inline-block; padding: 3px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; border: 1px solid;
   }
-  .budget-detail-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 14px;
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--emerald);
-  }
-  .budget-mode-row {
-    display: flex; align-items: center; gap: 14px;
-    margin: 8px 0;
-  }
-  .budget-mode-row label {
-    flex: 0 0 160px;
-    font-size: 12px; font-weight: 600; color: var(--text-secondary);
-    text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .budget-mode-status {
-    font-size: 12px; font-weight: 700; color: var(--emerald);
-    min-width: 18px; transition: opacity 0.3s;
-  }
+  .maturity-estimate { color: var(--text-muted); border-color: rgba(139,148,158,0.3); background: rgba(139,148,158,0.1); }
+  .maturity-measured { color: var(--blue); border-color: var(--blue-border); background: var(--blue-bg); }
+  .maturity-qualified { color: var(--emerald); border-color: var(--emerald-border); background: var(--emerald-bg); }
 
   .cell-eq-code { font-family: monospace; color: var(--emerald); font-weight: 700; }
   .cell-trl { font-weight: 700; color: var(--blue); }
@@ -3038,27 +3001,32 @@ def page_product_tree():
 let items = __INJECT_ITEMS_HERE__;
 let operatingModes = __INJECT_MODES_HERE__; // [{id, name}, ...]
 
-// Tracks which equipment row is currently expanded in the Budget view
-// (showing the per-mode power editor). Only one at a time.
-let openEquipId = null;
-
-// Debounce timers for per-mode power autosave. Keyed by `${equipId}:${modeId}`.
-const _powerSaveTimers = {};
-const _POWER_SAVE_DEBOUNCE_MS = 400;
-
 function triggerStreamlit(action, data) {
-    console.log("[pt] triggerStreamlit", action, data);
-    // We do NOT navigate the URL: the Streamlit `components.html` iframe is
-    // rendered with `srcdoc`, so `window.location.href` resolves to
-    // `about:srcdoc` and any `window.location.replace(...)` is a silent no-op.
-    // We also do NOT call `setComponentValue` here: this iframe is not
-    // directly wrapped by Streamlit, so the call is a no-op too.
-    //
-    // Instead, we postMessage the action to the parent window. A sibling
-    // `components.html` (the "pt_bridge") is listening and calls
-    // `Streamlit.setComponentValue` from inside its own iframe, which IS
-    // wrapped by Streamlit and does trigger a rerun. `st_autorefresh`
-    // guarantees that rerun fires even if the user is idle.
+    // Row-click → open the Edit dialog. The only reliable way to
+    // reach the Streamlit script from this srcdoc iframe is top-frame
+    // navigation: we set `window.parent.location.href` to the current
+    // page with a `pt_action=open_edit` query param. Streamlit picks
+    // it up on the next rerun, dispatches via
+    // `_process_product_tree_action`, which sets `_pt_active="edit"`
+    // and `_pt_edit_target_id`, and the existing `_pt_render_edit`
+    // dialog opens.
+    if (action === "open_edit_dialog" && data && data.id) {
+        try {
+            const parent = window.parent;
+            // Preserve any other query params (mission selection, etc.)
+            // by reusing the current parent's URL as the base.
+            const base = parent.location.pathname + parent.location.search;
+            const sep = base.includes('?') ? '&' : '?';
+            const payload = encodeURIComponent(JSON.stringify({ id: data.id }));
+            const target = base + sep + 'pt_action=open_edit&pt_data=' + payload;
+            parent.location.href = target;
+        } catch (e) {
+            console.error("[pt] top-frame navigation failed", e);
+        }
+        return;
+    }
+    // All other actions fall through to the postMessage + storage
+    // path, which is used by the (legacy) toolbar flows.
     try {
         sessionStorage.setItem('pt_action', action);
         sessionStorage.setItem('pt_data', JSON.stringify(data));
@@ -3182,116 +3150,54 @@ function renderTable() {
 }
 
 function renderBudget() {
+  // Read-only equipment table. Clicking a row navigates the top frame
+  // to open the existing _pt_render_edit dialog (where the user can
+  // change Mass, Qty, Maturity, TRL, Name, Level, Parent AND per-mode
+  // power with a real Save button — all wired through Streamlit
+  // session_state, not through the broken iframe → Python bridge).
   const equip = items.filter(i => i.level === 'equipment');
-  let rows = '';
-  equip.forEach(item => {
-    const isOpen = openEquipId === item.id;
-    rows += `
-      <tr class="budget-row ${isOpen ? 'open' : ''}" onclick="toggleEquipDetail('${item.id}')" title="Click to edit per-mode power">
+  const totalW = equip.reduce((s, it) => {
+    const pbm = it.power_by_mode || {};
+    return s + Object.values(pbm).reduce((a, v) => a + Number(v || 0), 0);
+  }, 0);
+  let rows = equip.map(item => {
+    const itemTotal = Object.values(item.power_by_mode || {})
+      .reduce((a, v) => a + Number(v || 0), 0);
+    // Per-mode power summary, comma-separated: "Op 18.0 W, Comm 35.0 W, …"
+    const modeSummary = (operatingModes || []).map(m => {
+      const v = (item.power_by_mode || {})[m.id] || 0;
+      return `${m.name} <b>${Number(v).toFixed(1)} W</b>`;
+    }).join(' &nbsp;·&nbsp; ');
+    return `
+      <tr class="budget-row" onclick="triggerStreamlit('open_edit_dialog', {id:'${item.id}'})" title="Click to edit">
         <td class="cell-eq-code">${item.code}</td>
         <td style="font-weight:600;color:var(--text-primary)">${item.name}</td>
-        <td><input class="budget-input" type="number" value="${item.mass}"
-            onclick="event.stopPropagation()"
-            onchange="updateItem('${item.id}','mass',parseFloat(this.value))"/></td>
+        <td>${Number(item.mass || 0).toFixed(2)}</td>
         <td style="font-weight:700;color:var(--text-muted)">${item.qty}</td>
-        <td>
-          <select class="maturity-select" onclick="event.stopPropagation()"
-              onchange="updateItem('${item.id}','maturity',this.value)">
-            <option ${item.maturity==='estimate'?'selected':''}>estimate</option>
-            <option ${item.maturity==='measured'?'selected':''}>measured</option>
-            <option ${item.maturity==='qualified'?'selected':''}>qualified</option>
-          </select>
-        </td>
+        <td><span class="maturity-pill maturity-${item.maturity}">${item.maturity}</span></td>
         <td class="cell-trl">${item.trl}</td>
-        <td style="text-align:right;color:var(--text-muted);font-size:12px;width:24px;">
-          ${isOpen ? '▾' : '▸'}
-        </td>
+        <td style="font-size:12px;color:var(--text-secondary);min-width:280px;">${modeSummary || '<span style="color:var(--text-muted);">no modes</span>'}</td>
+        <td style="text-align:right;font-weight:700;color:var(--emerald);">${itemTotal.toFixed(1)} W</td>
+        <td style="text-align:right;color:var(--text-muted);font-size:11px;width:90px;">click to edit →</td>
       </tr>`;
-    if (isOpen) {
-      // Per-mode power editor. Each input autosaves to the DB on change
-      // (debounced 400ms so we don't fire a request per keystroke).
-      const modeInputs = operatingModes.map(m => {
-        const cur = (item.power_by_mode && item.power_by_mode[m.id] != null)
-          ? item.power_by_mode[m.id] : 0;
-        return `
-          <div class="budget-mode-row">
-            <label>${m.name} (W)</label>
-            <input class="budget-input" type="number" min="0" step="0.5"
-                value="${cur}"
-                onclick="event.stopPropagation()"
-                onchange="onPowerChange('${item.id}','${m.id}',this)"/>
-            <span class="budget-mode-status" id="pw-status-${item.id}-${m.id}"></span>
-          </div>`;
-      }).join('');
-      const totalW = operatingModes.reduce((s, m) => {
-        const v = (item.power_by_mode && item.power_by_mode[m.id]) || 0;
-        return s + Number(v);
-      }, 0);
-      rows += `
-        <tr class="budget-detail">
-          <td colspan="7" onclick="event.stopPropagation()">
-            <div class="budget-detail-inner">
-              <div class="budget-detail-header">
-                <span>Per-mode power — <b>${item.code}</b></span>
-                <span style="color:var(--text-muted);font-size:11px;">Total across modes: ${totalW.toFixed(1)} W</span>
-              </div>
-              ${modeInputs || '<div style="color:var(--text-muted);font-size:12px;">No operating modes for this mission — add one in Settings → Operating Modes.</div>'}
-            </div>
-          </td>
-        </tr>`;
-    }
-  });
+  }).join('');
 
   document.getElementById('view-budget').innerHTML = `
     <div class="table-card" style="overflow-x:auto">
       <table style="white-space:nowrap">
         <thead><tr>
           <th>Equipment Code</th><th>Name</th><th>Mass (kg)</th>
-          <th>Qty</th><th>Maturity</th><th>TRL</th><th></th>
+          <th>Qty</th><th>Maturity</th><th>TRL</th>
+          <th>Power by mode</th><th>Σ Power</th><th></th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:32px;">No equipment nodes yet — add one in the Tree view.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:32px;">No equipment nodes yet — add one in the Tree view.</td></tr>'}</tbody>
+        ${equip.length ? `<tfoot><tr style="background:rgba(13,17,23,0.4);font-weight:700;">
+          <td colspan="7" style="text-align:right;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">Total Σ power across all equipment × all modes</td>
+          <td style="color:var(--emerald);">${totalW.toFixed(1)} W</td>
+          <td></td>
+        </tr></tfoot>` : ''}
       </table>
     </div>`;
-}
-
-function toggleEquipDetail(id) {
-  openEquipId = (openEquipId === id) ? null : id;
-  renderBudget();
-}
-
-function onPowerChange(equipId, modeId, el) {
-  const value = parseFloat(el.value);
-  const key = `${equipId}:${modeId}`;
-  // Update local state immediately so the total reflects the new value
-  // even before the DB roundtrip lands.
-  const item = items.find(i => i.id === equipId);
-  if (item) {
-    item.power_by_mode = item.power_by_mode || {};
-    item.power_by_mode[modeId] = isNaN(value) ? 0 : value;
-  }
-  // Visual "saving…" indicator
-  const status = document.getElementById(`pw-status-${equipId}-${modeId}`);
-  if (status) status.textContent = '…';
-  // Debounce the actual save — fire 400ms after the last keystroke.
-  clearTimeout(_powerSaveTimers[key]);
-  _powerSaveTimers[key] = setTimeout(() => {
-    updateItem(equipId, 'power', isNaN(value) ? 0 : value, modeId);
-    if (status) {
-      status.textContent = '✓';
-      setTimeout(() => { if (status.textContent === '✓') status.textContent = ''; }, 1500);
-    }
-  }, _POWER_SAVE_DEBOUNCE_MS);
-}
-
-function updateItem(id, field, value, modeId) {
-  items = items.map(i => i.id === id ? {...i, [field]: value} : i);
-  const updatedItem = items.find(i => i.id === id);
-  // For per-mode power autosave, send a richer payload so the Python
-  // side knows which row to upsert.
-  const payload = (field === 'power' && modeId)
-    ? {...updatedItem, field: 'power', mode: modeId}
-    : updatedItem;
-  triggerStreamlit("update_item", payload);
 }
 
 // ── VIEW SWITCHING ──
