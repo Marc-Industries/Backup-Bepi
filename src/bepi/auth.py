@@ -187,6 +187,32 @@ def render_auth_ui():
     .stHeaderActionElements, [data-testid="stHeaderActionElements"] {
         display: none !important;
     }
+    /* UniPD SSO button: rounded, full-width, brand icon left of the label.
+       Anchor must be a direct child of a <p> or <div>; we render it inside
+       a dedicated wrapper so the layout is consistent across Streamlit
+       re-renders. */
+    a.sso-unipd-btn {
+        display: flex; align-items: center; justify-content: center;
+        gap: 10px; width: 100%;
+        padding: 10px 18px; margin: 0;
+        background: linear-gradient(135deg, #a32638 0%, #7a1c2a 100%);
+        color: #ffffff !important; text-decoration: none !important;
+        font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+        border: 1px solid #7a1c2a; border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+    a.sso-unipd-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+        filter: brightness(1.08);
+    }
+    a.sso-unipd-btn:active { transform: translateY(0); filter: brightness(0.95); }
+    a.sso-unipd-btn img {
+        height: 22px; width: auto; display: block;
+        background: #ffffff; border-radius: 4px; padding: 2px 4px;
+    }
+    a.sso-unipd-btn .sso-unipd-label { line-height: 1; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -258,10 +284,14 @@ def render_auth_ui():
                 "text-transform:uppercase;'>— or —</div>",
                 unsafe_allow_html=True,
             )
-            st.link_button(
-                "🎓 Login with UniPD SSO",
-                sso_url,
-                use_container_width=True,
+            st.markdown(
+                f'<a class="sso-unipd-btn" href="{sso_url}" target="_self" '
+                f'rel="noopener">'
+                f'<img src="https://stem.elearning.unipd.it/pluginfile.php/'
+                f'1/auth_shibboleth/logo/SSO_unipd.png" alt="UniPD SSO"/>'
+                f'<span class="sso-unipd-label">Login with UniPD SSO</span>'
+                f'</a>',
+                unsafe_allow_html=True,
             )
 
     with tab_signup:
@@ -294,10 +324,14 @@ def render_auth_ui():
                 "text-transform:uppercase;'>— or —</div>",
                 unsafe_allow_html=True,
             )
-            st.link_button(
-                "🎓 Sign up with UniPD SSO",
-                sso_url,
-                use_container_width=True,
+            st.markdown(
+                f'<a class="sso-unipd-btn" href="{sso_url}" target="_self" '
+                f'rel="noopener">'
+                f'<img src="https://stem.elearning.unipd.it/pluginfile.php/'
+                f'1/auth_shibboleth/logo/SSO_unipd.png" alt="UniPD SSO"/>'
+                f'<span class="sso-unipd-label">Sign up with UniPD SSO</span>'
+                f'</a>',
+                unsafe_allow_html=True,
             )
 
     st.markdown("""

@@ -1,7 +1,7 @@
 # Graph Report - BEPI  (2026-07-20)
 
 ## Corpus Check
-- 150 files · ~153,053 words
+- 150 files · ~153,213 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `3be45991`
+- Built from commit: `4aa9916a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -271,8 +271,8 @@ Cohesion: 0.13
 Nodes (5): fake(), FakeClient, _Query, gates.py against an in-memory fake Supabase client (no live DB needed)., _Resp
 
 ### Community 37 - "Cluster 37"
-Cohesion: 0.15
-Nodes (14): scripts/check_streamlit_structure.py, streamlit/_badges.py, streamlit/_bootstrap.py, streamlit/_layout.py, streamlit/_loaders.py, streamlit/_mission.py, streamlit/_mock_data.py, streamlit/pages/ (+6 more)
+Cohesion: 0.20
+Nodes (10): scripts/check_streamlit_structure.py, streamlit/_badges.py, streamlit/_bootstrap.py, streamlit/_layout.py, streamlit/_mission.py, streamlit/_mock_data.py, streamlit/pages/, streamlit/_settings.py (+2 more)
 
 ### Community 38 - "Cluster 38"
 Cohesion: 0.36
@@ -283,8 +283,8 @@ Cohesion: 0.36
 Nodes (9): apply_outputs(), ParamMapping, prepare_inputs(), MATLAB/Octave bridge — execute scripts with parameter mapping., _resolve_engine(), run_script(), RunResult, ScriptConfig (+1 more)
 
 ### Community 40 - "Cluster 40"
-Cohesion: 0.20
-Nodes (10): P1: Cache product tree, S1: Ruolo default onboarding, bepi.services, Bug: Duplicati budget (Edit Equipment), Remember.md Snapshot 2026-06-20, RBAC 8 ruoli, TODO: DB Budget Edit Equipment (RISOLTO), TODO: Cookie SSO (NON IMPLEMENTATO) (+2 more)
+Cohesion: 0.15
+Nodes (14): P1: Cache product tree, S1: Ruolo default onboarding, bepi.services, Bug: Duplicati budget (Edit Equipment), Remember.md Snapshot 2026-06-20, RBAC 8 ruoli, streamlit/_loaders.py, streamlit/_pt_actions.py (+6 more)
 
 ### Community 41 - "Cluster 41"
 Cohesion: 0.12

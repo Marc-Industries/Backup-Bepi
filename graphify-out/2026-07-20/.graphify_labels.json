@@ -86,5 +86,7 @@
   "84": "seed_demo_mission.py",
   "85": "test_risk_loading.py",
   "86": "validation.py",
-  "87": "test_boot_mock.py"
+  "87": "test_boot_mock.py",
+  "88": "test_sso_callback.py",
+  "89": "imports"
 }

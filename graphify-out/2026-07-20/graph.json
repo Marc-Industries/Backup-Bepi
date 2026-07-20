@@ -315,8 +315,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgets.py"
     },
     {
@@ -326,8 +326,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_list_allocations",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "list_allocations()"
     },
     {
@@ -337,8 +337,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_py_asyncsession",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "asyncsession"
     },
     {
@@ -348,8 +348,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_create_allocation",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "create_allocation()"
     },
     {
@@ -359,8 +359,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_get_allocation",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "get_allocation()"
     },
     {
@@ -370,8 +370,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_update_allocation",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "update_allocation()"
     },
     {
@@ -381,8 +381,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_delete_allocation",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "delete_allocation()"
     },
     {
@@ -392,8 +392,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_list_limits",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "list_limits()"
     },
     {
@@ -403,8 +403,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_create_limit",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "create_limit()"
     },
     {
@@ -414,8 +414,8 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_get_limit",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "get_limit()"
     },
     {
@@ -425,8 +425,8 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_delete_limit",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "delete_limit()"
     },
     {
@@ -436,8 +436,8 @@
       "source_location": "L111",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_budget_summary",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budget_summary()"
     },
     {
@@ -447,8 +447,8 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_build_rollup_node",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "_build_rollup_node()"
     },
     {
@@ -458,8 +458,8 @@
       "source_location": "L209",
       "_origin": "ast",
       "id": "src_bepi_api_v1_budgets_budget_rollup",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budget_rollup()"
     },
     {
@@ -733,8 +733,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirements.py"
     },
     {
@@ -744,8 +744,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_list_requirements",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "list_requirements()"
     },
     {
@@ -755,8 +755,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_py_asyncsession",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "asyncsession"
     },
     {
@@ -766,8 +766,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_create_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "create_requirement()"
     },
     {
@@ -777,8 +777,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_bulk_import_requirements",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "bulk_import_requirements()"
     },
     {
@@ -788,8 +788,8 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_get_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "get_requirement()"
     },
     {
@@ -799,8 +799,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_update_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "update_requirement()"
     },
     {
@@ -810,8 +810,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_delete_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "delete_requirement()"
     },
     {
@@ -821,8 +821,8 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_get_requirement_trace",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "get_requirement_trace()"
     },
     {
@@ -832,8 +832,8 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_verification_matrix",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "verification_matrix()"
     },
     {
@@ -843,8 +843,8 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "src_bepi_api_v1_requirements_coverage_report",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "coverage_report()"
     },
     {
@@ -1442,10 +1442,32 @@
       "norm_label": "_restore_from_cookie()"
     },
     {
-      "label": "render_auth_ui()",
+      "label": "_handle_sso_callback()",
       "file_type": "code",
       "source_file": "src/bepi/auth.py",
       "source_location": "L81",
+      "_origin": "ast",
+      "id": "src_bepi_auth_handle_sso_callback",
+      "community": 33,
+      "community_name": "Cluster 33",
+      "norm_label": "_handle_sso_callback()"
+    },
+    {
+      "label": "_sso_button_url()",
+      "file_type": "code",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L123",
+      "_origin": "ast",
+      "id": "src_bepi_auth_sso_button_url",
+      "community": 33,
+      "community_name": "Cluster 33",
+      "norm_label": "_sso_button_url()"
+    },
+    {
+      "label": "render_auth_ui()",
+      "file_type": "code",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L135",
       "_origin": "ast",
       "id": "src_bepi_auth_render_auth_ui",
       "community": 33,
@@ -1456,7 +1478,7 @@
       "label": "logout()",
       "file_type": "code",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L222",
+      "source_location": "L312",
       "_origin": "ast",
       "id": "src_bepi_auth_logout",
       "community": 33,
@@ -1467,7 +1489,7 @@
       "label": "get_current_user()",
       "file_type": "code",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L240",
+      "source_location": "L330",
       "_origin": "ast",
       "id": "src_bepi_auth_get_current_user",
       "community": 33,
@@ -1478,7 +1500,7 @@
       "label": "check_password()",
       "file_type": "code",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L244",
+      "source_location": "L334",
       "_origin": "ast",
       "id": "src_bepi_auth_check_password",
       "community": 33,
@@ -1508,12 +1530,34 @@
       "norm_label": "try to restore session from browser cookies. returns true if restored."
     },
     {
+      "label": "Consume the SSO callback redirected back from the sso-unipd Edge     Function. T",
+      "file_type": "rationale",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L82",
+      "_origin": "ast",
+      "id": "src_bepi_auth_rationale_82",
+      "community": 33,
+      "community_name": "Cluster 33",
+      "norm_label": "consume the sso callback redirected back from the sso-unipd edge     function. t"
+    },
+    {
+      "label": "Build the Edge Function login URL from the Supabase project URL.     Returns Non",
+      "file_type": "rationale",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L124",
+      "_origin": "ast",
+      "id": "src_bepi_auth_rationale_124",
+      "community": 33,
+      "community_name": "Cluster 33",
+      "norm_label": "build the edge function login url from the supabase project url.     returns non"
+    },
+    {
       "label": "Local-dev / demo password gate, used ONLY when Supabase auth is not     configur",
       "file_type": "rationale",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L245",
+      "source_location": "L335",
       "_origin": "ast",
-      "id": "src_bepi_auth_rationale_245",
+      "id": "src_bepi_auth_rationale_335",
       "community": 33,
       "community_name": "Cluster 33",
       "norm_label": "local-dev / demo password gate, used only when supabase auth is not     configur"
@@ -1679,8 +1723,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_bepi_core_enums_budgettype",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgettype"
     },
     {
@@ -1690,8 +1734,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "src_bepi_core_enums_maturity",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "maturity"
     },
     {
@@ -1701,8 +1745,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_bepi_core_enums_marginstatus",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "marginstatus"
     },
     {
@@ -1712,8 +1756,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_bepi_core_enums_requirementlevel",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementlevel"
     },
     {
@@ -1723,8 +1767,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_bepi_core_enums_requirementcategory",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementcategory"
     },
     {
@@ -1734,8 +1778,8 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "src_bepi_core_enums_verificationmethod",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "verificationmethod"
     },
     {
@@ -1745,8 +1789,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_bepi_core_enums_verificationstatus",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "verificationstatus"
     },
     {
@@ -1756,8 +1800,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_bepi_core_enums_requirementstatus",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementstatus"
     },
     {
@@ -1767,8 +1811,8 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_bepi_core_enums_priority",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "priority"
     },
     {
@@ -1833,8 +1877,8 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "src_bepi_core_enums_taskstatus",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "taskstatus"
     },
     {
@@ -1844,8 +1888,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_bepi_core_enums_dependencytype",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "dependencytype"
     },
     {
@@ -1855,8 +1899,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "src_bepi_core_enums_milestonestatus",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "milestonestatus"
     },
     {
@@ -1987,8 +2031,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_core_models_budget",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budget.py"
     },
     {
@@ -1998,8 +2042,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_bepi_core_models_budget_budgetallocation",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetallocation"
     },
     {
@@ -2009,8 +2053,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "src_bepi_core_models_budget_budgetallocation_value_with_margin",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": ".value_with_margin()"
     },
     {
@@ -2020,8 +2064,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_bepi_core_models_budget_budgetlimit",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetlimit"
     },
     {
@@ -2130,8 +2174,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_core_models_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirement.py"
     },
     {
@@ -2141,8 +2185,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_bepi_core_models_requirement_requirement",
-      "community": 1,
-      "community_name": "Risks API (FMECA/FTA)",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirement"
     },
     {
@@ -2317,8 +2361,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budget.py"
     },
     {
@@ -2328,8 +2372,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetallocationcreate",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetallocationcreate"
     },
     {
@@ -2339,8 +2383,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_py_basemodel",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "basemodel"
     },
     {
@@ -2350,8 +2394,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetallocationupdate",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetallocationupdate"
     },
     {
@@ -2361,8 +2405,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetallocationread",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetallocationread"
     },
     {
@@ -2372,8 +2416,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetlimitcreate",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetlimitcreate"
     },
     {
@@ -2383,8 +2427,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetlimitread",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetlimitread"
     },
     {
@@ -2394,8 +2438,8 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetlineitem",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetlineitem"
     },
     {
@@ -2405,8 +2449,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetsummaryresponse",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetsummaryresponse"
     },
     {
@@ -2416,8 +2460,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetrollupnode",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetrollupnode"
     },
     {
@@ -2427,8 +2471,8 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_budget_budgetrollupresponse",
-      "community": 4,
-      "community_name": "Product Tree API",
+      "community": 2,
+      "community_name": "Requirements API",
       "norm_label": "budgetrollupresponse"
     },
     {
@@ -2625,8 +2669,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirement.py"
     },
     {
@@ -2636,8 +2680,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_requirementcreate",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementcreate"
     },
     {
@@ -2647,8 +2691,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_py_basemodel",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "basemodel"
     },
     {
@@ -2658,8 +2702,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_requirementupdate",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementupdate"
     },
     {
@@ -2669,8 +2713,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_requirementread",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "requirementread"
     },
     {
@@ -2680,8 +2724,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_verificationmatrixrow",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "verificationmatrixrow"
     },
     {
@@ -2691,8 +2735,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_verificationmatrixresponse",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "verificationmatrixresponse"
     },
     {
@@ -2702,8 +2746,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_requirement_coveragereportresponse",
-      "community": 2,
-      "community_name": "Requirements API",
+      "community": 4,
+      "community_name": "Product Tree API",
       "norm_label": "coveragereportresponse"
     },
     {
@@ -2911,8 +2955,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "schedule.py"
     },
     {
@@ -2922,8 +2966,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_wbsnodecreate",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "wbsnodecreate"
     },
     {
@@ -2933,8 +2977,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_py_basemodel",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "basemodel"
     },
     {
@@ -2944,8 +2988,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_wbsnoderead",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "wbsnoderead"
     },
     {
@@ -2955,8 +2999,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_taskcreate",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "taskcreate"
     },
     {
@@ -2966,8 +3010,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_taskupdate",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "taskupdate"
     },
     {
@@ -2977,8 +3021,8 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_taskread",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "taskread"
     },
     {
@@ -2988,8 +3032,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_taskdependencycreate",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "taskdependencycreate"
     },
     {
@@ -2999,8 +3043,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_milestonecreate",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "milestonecreate"
     },
     {
@@ -3010,8 +3054,8 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_milestoneread",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "milestoneread"
     },
     {
@@ -3021,8 +3065,8 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_gantttask",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "gantttask"
     },
     {
@@ -3032,8 +3076,8 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_ganttresponse",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "ganttresponse"
     },
     {
@@ -3043,8 +3087,8 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_cpmtaskresult",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "cpmtaskresult"
     },
     {
@@ -3054,8 +3098,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "src_bepi_core_schemas_schedule_cpmresponse",
-      "community": 84,
-      "community_name": "seed_demo_mission.py",
+      "community": 1,
+      "community_name": "Risks API (FMECA/FTA)",
       "norm_label": "cpmresponse"
     },
     {
@@ -4242,8 +4286,8 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "src_bepi_integrations_celestial_bodies_solar_flux_at_body",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 0,
+      "community_name": "Celestial Bodies Data",
       "norm_label": "solar_flux_at_body()"
     },
     {
@@ -4253,8 +4297,8 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "src_bepi_integrations_celestial_bodies_body_names",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 0,
+      "community_name": "Celestial Bodies Data",
       "norm_label": "body_names()"
     },
     {
@@ -7311,8 +7355,8 @@
       "source_location": "L798",
       "_origin": "ast",
       "id": "src_bepi_integrations_orbit_viz_interplanetary_data",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 0,
+      "community_name": "Celestial Bodies Data",
       "norm_label": "interplanetary_data()"
     },
     {
@@ -7322,8 +7366,8 @@
       "source_location": "L845",
       "_origin": "ast",
       "id": "src_bepi_integrations_orbit_viz_plot_interplanetary",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 0,
+      "community_name": "Celestial Bodies Data",
       "norm_label": "plot_interplanetary()"
     },
     {
@@ -8257,8 +8301,8 @@
       "source_location": "L551",
       "_origin": "ast",
       "id": "src_bepi_integrations_sat_3d_model_geometry_to_sat_faces",
-      "community": 23,
-      "community_name": "Satellite 3D Model",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "geometry_to_sat_faces()"
     },
     {
@@ -8939,8 +8983,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_satface",
-      "community": 23,
-      "community_name": "Satellite 3D Model",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "satface"
     },
     {
@@ -8950,8 +8994,8 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_compute_view_factor_to_body",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "compute_view_factor_to_body()"
     },
     {
@@ -8961,8 +9005,8 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_coerce_faces",
-      "community": 23,
-      "community_name": "Satellite 3D Model",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "_coerce_faces()"
     },
     {
@@ -8972,8 +9016,8 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_compute_face_fluxes",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "compute_face_fluxes()"
     },
     {
@@ -8983,8 +9027,8 @@
       "source_location": "L183",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_first_order_thermal",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 78,
+      "community_name": "seed_demo_mission",
       "norm_label": "first_order_thermal()"
     },
     {
@@ -9104,8 +9148,8 @@
       "source_location": "L441",
       "_origin": "ast",
       "id": "src_bepi_integrations_thermal_model_make_sun_arrow",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 25,
+      "community_name": "Misc Utilities (cone, etc.)",
       "norm_label": "make_sun_arrow()"
     },
     {
@@ -9115,8 +9159,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "cone",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 25,
+      "community_name": "Misc Utilities (cone, etc.)",
       "norm_label": "cone"
     },
     {
@@ -11876,8 +11920,8 @@
       "source_location": "L3997",
       "_origin": "ast",
       "id": "streamlit_app_render_budget",
-      "community": 6,
-      "community_name": "Budget Allocation & Rollup",
+      "community": 15,
+      "community_name": "Onboarding & Mission Helpers",
       "norm_label": "_render_budget()"
     },
     {
@@ -12052,8 +12096,8 @@
       "source_location": "L6686",
       "_origin": "ast",
       "id": "streamlit_app_page_integrations",
-      "community": 52,
-      "community_name": "Cluster 52",
+      "community": 25,
+      "community_name": "Misc Utilities (cone, etc.)",
       "norm_label": "page_integrations()"
     },
     {
@@ -12363,6 +12407,248 @@
       "community": 45,
       "community_name": "Cluster 45",
       "norm_label": "isemail()"
+    },
+    {
+      "label": "deno.json",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/deno.json",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_deno",
+      "community": 89,
+      "community_name": "imports",
+      "norm_label": "deno.json"
+    },
+    {
+      "label": "imports",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/deno.json",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_deno_imports",
+      "community": 89,
+      "community_name": "imports",
+      "norm_label": "imports"
+    },
+    {
+      "label": "std/http/server",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/deno.json",
+      "source_location": "L3",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_deno_imports_std_http_server",
+      "community": 89,
+      "community_name": "imports",
+      "norm_label": "std/http/server"
+    },
+    {
+      "label": "index.ts",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "index.ts"
+    },
+    {
+      "label": "corsHeaders",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L71",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_corsheaders",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "corsheaders"
+    },
+    {
+      "label": "json()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L78",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_json",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "json()"
+    },
+    {
+      "label": "redirect()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L84",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_redirect",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "redirect()"
+    },
+    {
+      "label": "html()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L90",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_html",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "html()"
+    },
+    {
+      "label": "sbAdmin()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L98",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_sbadmin",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "sbadmin()"
+    },
+    {
+      "label": "isEmail()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L111",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_isemail",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "isemail()"
+    },
+    {
+      "label": "checkIdpCertValidity()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_checkidpcertvalidity",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "checkidpcertvalidity()"
+    },
+    {
+      "label": "buildAuthnRequest()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L133",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_buildauthnrequest",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "buildauthnrequest()"
+    },
+    {
+      "label": "randomId()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L149",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_randomid",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "randomid()"
+    },
+    {
+      "label": "deflateBase64()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L155",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_deflatebase64",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "deflatebase64()"
+    },
+    {
+      "label": "buildLoginRedirect()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L170",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "buildloginredirect()"
+    },
+    {
+      "label": "verifySamlResponse()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L183",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "verifysamlresponse()"
+    },
+    {
+      "label": "base64ToBytes()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L308",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_base64tobytes",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "base64tobytes()"
+    },
+    {
+      "label": "importPublicKey()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L315",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_importpublickey",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "importpublickey()"
+    },
+    {
+      "label": "upsertUser()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L338",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_upsertuser",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "upsertuser()"
+    },
+    {
+      "label": "generateMagicLinkToken()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L378",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_generatemagiclinktoken",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "generatemagiclinktoken()"
+    },
+    {
+      "label": "handleGet()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L404",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_handleget",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "handleget()"
+    },
+    {
+      "label": "handlePost()",
+      "file_type": "code",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L413",
+      "_origin": "ast",
+      "id": "supabase_functions_sso_unipd_index_handlepost",
+      "community": 84,
+      "community_name": "seed_demo_mission.py",
+      "norm_label": "handlepost()"
     },
     {
       "label": "__init__.py",
@@ -14191,6 +14477,138 @@
       "norm_label": "2-of-3 vote gate with equal probabilities.         p(at least 2 of 3 fail) with"
     },
     {
+      "label": "test_sso_callback.py",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_sso_callback.py"
+    },
+    {
+      "label": "_load_auth_with_stubs()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "_load_auth_with_stubs()"
+    },
+    {
+      "label": "_make_fake_client()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_make_fake_client",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "_make_fake_client()"
+    },
+    {
+      "label": "test_callback_returns_false_when_no_token()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L76",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_token",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_callback_returns_false_when_no_token()"
+    },
+    {
+      "label": "test_callback_establishes_session_and_writes_cookies()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L87",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_test_callback_establishes_session_and_writes_cookies",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_callback_establishes_session_and_writes_cookies()"
+    },
+    {
+      "label": "test_callback_returns_false_when_no_supabase()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L129",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_supabase",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_callback_returns_false_when_no_supabase()"
+    },
+    {
+      "label": "test_callback_handles_verify_otp_exception()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L141",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_test_callback_handles_verify_otp_exception",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_callback_handles_verify_otp_exception()"
+    },
+    {
+      "label": "test_callback_returns_false_when_session_missing()",
+      "file_type": "code",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L155",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_test_callback_returns_false_when_session_missing",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "test_callback_returns_false_when_session_missing()"
+    },
+    {
+      "label": "Tests for the SSO callback handler in src/bepi/auth.py.  The callback is the onl",
+      "file_type": "rationale",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_rationale_1",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "tests for the sso callback handler in src/bepi/auth.py.  the callback is the onl"
+    },
+    {
+      "label": "Import auth.py with streamlit and supabase_client stubbed, and     return the mo",
+      "file_type": "rationale",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_rationale_17",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "import auth.py with streamlit and supabase_client stubbed, and     return the mo"
+    },
+    {
+      "label": "Return a fake supabase client and patch get_supabase to return it.",
+      "file_type": "rationale",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L57",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_rationale_57",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "return a fake supabase client and patch get_supabase to return it."
+    },
+    {
+      "label": "verify_otp returns something with no session \u2014 we treat as failure.",
+      "file_type": "rationale",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L156",
+      "_origin": "ast",
+      "id": "tests_unit_test_sso_callback_rationale_156",
+      "community": 88,
+      "community_name": "test_sso_callback.py",
+      "norm_label": "verify_otp returns something with no session \u2014 we treat as failure."
+    },
+    {
       "label": "BRIEF - Handover.md",
       "file_type": "document",
       "source_file": "docs/ecss-corpus/BRIEF - Handover.md",
@@ -15621,9 +16039,9 @@
       "confidence": "EXTRACTED",
       "source_location": "Database Schema",
       "file_type": "concept",
-      "community": 40,
+      "community": 37,
       "norm_label": "table: product_tree_nodes",
-      "community_name": "Cluster 40",
+      "community_name": "Cluster 37",
       "id": "table-product-tree-nodes"
     },
     {
@@ -15634,9 +16052,9 @@
       "confidence": "EXTRACTED",
       "source_location": "Database Schema",
       "file_type": "concept",
-      "community": 40,
+      "community": 37,
       "norm_label": "table: equip_budgets",
-      "community_name": "Cluster 40",
+      "community_name": "Cluster 37",
       "id": "table-equip-budgets"
     },
     {
@@ -16152,9 +16570,9 @@
       "confidence": "EXTRACTED",
       "source_location": "Fase 1",
       "file_type": "concept",
-      "community": 40,
+      "community": 37,
       "norm_label": "streamlit/_pt_actions.py",
-      "community_name": "Cluster 40",
+      "community_name": "Cluster 37",
       "id": "streamlit-pt-actions"
     },
     {
@@ -16176,9 +16594,9 @@
       "source_file": "STREAMLIT_REFACTORING.md",
       "confidence": "EXTRACTED",
       "file_type": "concept",
-      "community": 40,
+      "community": 37,
       "norm_label": "streamlit/_loaders.py",
-      "community_name": "Cluster 40",
+      "community_name": "Cluster 37",
       "id": "streamlit-loaders"
     },
     {
@@ -20070,6 +20488,18 @@
       "target": "src_bepi_core_schemas_schedule_gantttask"
     },
     {
+      "relation": "references",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/bepi/api/v1/schedule.py",
+      "source_location": "L208",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_api_v1_schedule_gantt_data",
+      "target": "src_bepi_core_schemas_schedule_milestoneread"
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "INFERRED",
@@ -20204,7 +20634,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L244",
+      "source_location": "L334",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth",
@@ -20226,7 +20656,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L240",
+      "source_location": "L330",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth",
@@ -20237,7 +20667,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L222",
+      "source_location": "L81",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth",
+      "target": "src_bepi_auth_handle_sso_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L312",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth",
@@ -20248,7 +20689,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L81",
+      "source_location": "L135",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth",
@@ -20264,6 +20705,17 @@
       "_origin": "ast",
       "source": "src_bepi_auth",
       "target": "src_bepi_auth_restore_from_cookie",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L123",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth",
+      "target": "src_bepi_auth_sso_button_url",
       "confidence_score": 1.0
     },
     {
@@ -20305,7 +20757,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L223",
+      "source_location": "L313",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_logout",
@@ -20317,7 +20769,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L82",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_render_auth_ui",
@@ -20329,7 +20781,19 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L176",
+      "source_location": "L109",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_handle_sso_callback",
+      "target": "src_bepi_auth_user_dict",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L237",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_render_auth_ui",
@@ -20423,7 +20887,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L85",
+      "source_location": "L139",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_render_auth_ui",
@@ -20448,7 +20912,65 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/bepi/auth.py",
-      "source_location": "L172",
+      "source_location": "L94",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_handle_sso_callback",
+      "target": "src_bepi_supabase_client_get_supabase"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L82",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_rationale_82",
+      "target": "src_bepi_auth_handle_sso_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L147",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_render_auth_ui",
+      "target": "src_bepi_auth_handle_sso_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L124",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_rationale_124",
+      "target": "src_bepi_auth_sso_button_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L222",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_bepi_auth_render_auth_ui",
+      "target": "src_bepi_auth_sso_button_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "src/bepi/auth.py",
+      "source_location": "L233",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_render_auth_ui",
@@ -20460,7 +20982,7 @@
       "confidence": "INFERRED",
       "confidence_score": 0.8,
       "source_file": "src/bepi/auth.py",
-      "source_location": "L230",
+      "source_location": "L320",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_bepi_auth_logout",
@@ -20470,10 +20992,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "src/bepi/auth.py",
-      "source_location": "L245",
+      "source_location": "L335",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "src_bepi_auth_rationale_245",
+      "source": "src_bepi_auth_rationale_335",
       "target": "src_bepi_auth_check_password",
       "confidence_score": 1.0
     },
@@ -47678,6 +48200,466 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/deno.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_deno",
+      "target": "supabase_functions_sso_unipd_deno_imports",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/deno.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_deno_imports",
+      "target": "supabase_functions_sso_unipd_deno_imports_std_http_server",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L308",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_base64tobytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L133",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_buildauthnrequest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L170",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L114",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_checkidpcertvalidity",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L71",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_corsheaders",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L155",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_deflatebase64",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L378",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_generatemagiclinktoken",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L404",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_handleget",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L413",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_handlepost",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L90",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L315",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_importpublickey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L111",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_isemail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L78",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L149",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_randomid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L84",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_redirect",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L98",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_sbadmin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L338",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_upsertuser",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L183",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index",
+      "target": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L391",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_generatemagiclinktoken",
+      "target": "supabase_functions_sso_unipd_index_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L408",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handleget",
+      "target": "supabase_functions_sso_unipd_index_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L434",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L353",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_upsertuser",
+      "target": "supabase_functions_sso_unipd_index_json",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L179",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "target": "supabase_functions_sso_unipd_index_redirect",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L442",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_redirect",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L418",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L379",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_generatemagiclinktoken",
+      "target": "supabase_functions_sso_unipd_index_sbadmin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L344",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_upsertuser",
+      "target": "supabase_functions_sso_unipd_index_sbadmin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L300",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "target": "supabase_functions_sso_unipd_index_isemail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L173",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "target": "supabase_functions_sso_unipd_index_buildauthnrequest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L171",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "target": "supabase_functions_sso_unipd_index_randomid",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L174",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "target": "supabase_functions_sso_unipd_index_deflatebase64",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L410",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handleget",
+      "target": "supabase_functions_sso_unipd_index_buildloginredirect",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L424",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L232",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "target": "supabase_functions_sso_unipd_index_base64tobytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L225",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_verifysamlresponse",
+      "target": "supabase_functions_sso_unipd_index_importpublickey",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L319",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_importpublickey",
+      "target": "supabase_functions_sso_unipd_index_base64tobytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L437",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_upsertuser",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "supabase/functions/sso-unipd/index.ts",
+      "source_location": "L438",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "supabase_functions_sso_unipd_index_handlepost",
+      "target": "supabase_functions_sso_unipd_index_generatemagiclinktoken",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "tests/unit/test_auth_role.py",
       "source_location": "L29",
       "weight": 1.0,
@@ -49808,6 +50790,235 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L87",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_test_callback_establishes_session_and_writes_cookies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L141",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_test_callback_handles_verify_otp_exception",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L129",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_supabase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L76",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_token",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L155",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback",
+      "target": "tests_unit_test_sso_callback_test_callback_returns_false_when_session_missing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_rationale_1",
+      "target": "tests_unit_test_sso_callback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_rationale_17",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_establishes_session_and_writes_cookies",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L144",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_handles_verify_otp_exception",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L132",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_supabase",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L79",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_token",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L159",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_returns_false_when_session_missing",
+      "target": "tests_unit_test_sso_callback_load_auth_with_stubs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L57",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_rationale_57",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L104",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_establishes_session_and_writes_cookies",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L145",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_handles_verify_otp_exception",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L80",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_returns_false_when_no_token",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L161",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_test_callback_returns_false_when_session_missing",
+      "target": "tests_unit_test_sso_callback_make_fake_client",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "tests/unit/test_sso_callback.py",
+      "source_location": "L156",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "tests_unit_test_sso_callback_rationale_156",
+      "target": "tests_unit_test_sso_callback_test_callback_returns_false_when_session_missing",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "docs/ecss-corpus/BRIEF - Handover.md",
       "source_location": "L1",
       "weight": 1.0,
@@ -51792,5 +53003,5 @@
       "confidence": "EXTRACTED"
     }
   ],
-  "built_at_commit": "54bb6aa794dfd0a5dbdbadd487b3da2c26543072"
+  "built_at_commit": "3be45991a4e7bb487bcc39a7509877a191b1a5e5"
 }
