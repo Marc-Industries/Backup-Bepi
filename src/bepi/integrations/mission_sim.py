@@ -1,12 +1,15 @@
-"""Mission-level simulator: circular orbit propagation (two-body / J2 secular),
-eclipse and per-face solar power, battery state of charge, ground-station
-passes, RF link margins, and GO/NO-GO checks. Pure module: numpy + stdlib only.
+"""Mission-level simulator: elliptical orbit propagation (two-body / J2 secular
+/ J2+drag / SGP4), eclipse and per-face solar power, battery state of charge,
+ground-station passes, RF link margins, orbital lifetime, and GO/NO-GO checks.
+Pure module: numpy + stdlib only; the optional "sgp4" propagator lazily imports
+the sgp4 package.
 """
 
 from __future__ import annotations
 
 import copy
 import math
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -16,6 +19,7 @@ MU_EARTH = 398600.4418   # km^3/s^2
 R_EARTH = 6378.137       # km (WGS-84 equatorial)
 SOLAR_CONSTANT = 1361.0  # W/m^2
 J2 = 1.08262668e-3
+OMEGA_EARTH = 7.2921159e-5  # rad/s, Earth rotation rate
 BOLTZMANN_DBW = 228.6    # -10*log10(k_B), dB(W/(K*Hz))
 
 _C_LIGHT = 299_792_458.0  # m/s
@@ -32,8 +36,10 @@ class OrbitSpec:
     raan_deg: float = 0.0
     arg_perigee_deg: float = 0.0
     true_anomaly_deg: float = 0.0
-    eccentricity: float = 0.0  # kept for forward-compat; v1 propagates circular
-    propagator: str = "j2"     # "two_body" | "j2" (J2 = secular RAAN drift only)
+    eccentricity: float = 0.0  # [0, 1); fully honored by the elliptical propagators
+    propagator: str = "j2"     # "two_body" | "j2" | "j2_drag" | "sgp4"
+    tle_line1: str = ""        # for propagator="sgp4"
+    tle_line2: str = ""
 
 
 @dataclass
@@ -99,6 +105,7 @@ class SatelliteSpec:
     links: list = field(default_factory=list)
     mass_kg: float = 0.0
     drag_area_m2: float = 0.0
+    drag_coefficient: float = 2.2
 
 
 @dataclass
@@ -222,32 +229,348 @@ def slant_range_km(altitude_km: float, elevation_rad: float) -> float:
     return math.sqrt(R_EARTH**2 * se**2 + 2.0 * R_EARTH * h + h**2) - R_EARTH * se
 
 
+# Exponential atmosphere, Vallado "Fundamentals of Astrodynamics and
+# Applications" Table 8-4: (base altitude h0 [km], rho0 [kg/m^3], scale
+# height H [km]) per band; rho = rho0 * exp(-(h - h0)/H) within a band.
+_ATMOSPHERE_TABLE = (
+    (0.0, 1.225, 7.249),
+    (25.0, 3.899e-2, 6.349),
+    (30.0, 1.774e-2, 6.682),
+    (40.0, 3.972e-3, 7.554),
+    (50.0, 1.057e-3, 8.382),
+    (60.0, 3.206e-4, 7.714),
+    (70.0, 8.770e-5, 6.549),
+    (80.0, 1.905e-5, 5.799),
+    (90.0, 3.396e-6, 5.382),
+    (100.0, 5.297e-7, 5.877),
+    (110.0, 9.661e-8, 7.263),
+    (120.0, 2.438e-8, 9.473),
+    (130.0, 8.484e-9, 12.636),
+    (140.0, 3.845e-9, 16.149),
+    (150.0, 2.070e-9, 22.523),
+    (180.0, 5.464e-10, 29.740),
+    (200.0, 2.789e-10, 37.105),
+    (250.0, 7.248e-11, 45.546),
+    (300.0, 2.418e-11, 53.628),
+    (350.0, 9.518e-12, 53.298),
+    (400.0, 3.725e-12, 58.515),
+    (450.0, 1.585e-12, 60.828),
+    (500.0, 6.967e-13, 63.822),
+    (600.0, 1.454e-13, 71.835),
+    (700.0, 3.614e-14, 88.667),
+    (800.0, 1.170e-14, 124.64),
+    (900.0, 5.245e-15, 181.05),
+    (1000.0, 3.019e-15, 268.00),
+)
+
+
+_ATM_H0 = np.array([b[0] for b in _ATMOSPHERE_TABLE])
+_ATM_RHO0 = np.array([b[1] for b in _ATMOSPHERE_TABLE])
+_ATM_SH = np.array([b[2] for b in _ATMOSPHERE_TABLE])
+
+
+def atmosphere_density(h_km: float) -> float:
+    """Atmospheric density [kg/m^3] at altitude h_km (Vallado Table 8-4
+    piecewise-exponential model; the last band extrapolates above 1000 km)."""
+    h = max(float(h_km), 0.0)
+    row = _ATMOSPHERE_TABLE[0]
+    for band in _ATMOSPHERE_TABLE:
+        if h >= band[0]:
+            row = band
+        else:
+            break
+    h0, rho0, scale_h = row
+    return rho0 * math.exp(-(h - h0) / scale_h)
+
+
+def _atmosphere_density_arr(h_km: np.ndarray) -> np.ndarray:
+    """Vectorized atmosphere_density for (N,) altitude arrays."""
+    h = np.maximum(np.asarray(h_km, dtype=float), 0.0)
+    idx = np.clip(np.searchsorted(_ATM_H0, h, side="right") - 1, 0, len(_ATM_H0) - 1)
+    return _ATM_RHO0[idx] * np.exp(-(h - _ATM_H0[idx]) / _ATM_SH[idx])
+
+
+# Eccentric-anomaly quadrature nodes for the orbit-averaged drag decay rate.
+# 512 nodes resolve the sharp perigee density peak: its Gaussian half-width in
+# E is sqrt(H/(a*e)) (~0.05 rad for GTO), several times the node spacing.
+_DRAG_QUAD_NODES = np.linspace(0.0, 2.0 * np.pi, 513)[:-1]
+
+
+def _mean_decay_rate_km_s(a: float, e: float, bc: float, co_rot: float) -> float:
+    """Orbit-averaged SMA decay rate [km/s] from atmospheric drag.
+
+    e = 0: classical circular King-Hele rate
+        da/dt = -co_rot * rho(a - RE) * sqrt(mu*a) * bc * 1000
+    (identical to the validated circular path). e > 0: numerical average of
+    the Gauss variational rate over eccentric anomaly,
+        <da/dt> = -co_rot * bc * a^2/(2*pi*mu) * Int rho(h(E)) v(E)^3 (1 - e*cosE) dE,
+    which samples the density along the true radius down to perigee. (The
+    earlier circular-average shortcut evaluated rho at the SMA altitude and was
+    wrong by orders of magnitude for eccentric orbits — a GTO perigee grazing
+    dense LEO air was treated as vacuum.) bc = Cd*A/m in m^2/kg.
+    """
+    if e <= 0.0:
+        rho = atmosphere_density(a - R_EARTH)
+        return -co_rot * rho * math.sqrt(MU_EARTH * a) * bc * 1000.0
+    ce = np.cos(_DRAG_QUAD_NODES)
+    r = a * (1.0 - e * ce)
+    rho = _atmosphere_density_arr(r - R_EARTH)
+    v2 = MU_EARTH * (2.0 / r - 1.0 / a)
+    # (1/2pi) Int rho * v^3 * (1 - e*cosE) dE
+    mean = float(np.mean(rho * v2**1.5 * (1.0 - e * ce)))
+    # a^2/mu * <rho_bc v^3> is km^2/s * (1/m) -> *1000 for km/s
+    return -co_rot * bc * a * a / MU_EARTH * mean * 1000.0
+
+
+def solve_kepler(mean_anomaly, eccentricity: float, tol: float = 1e-12,
+                 max_iter: int = 60) -> np.ndarray:
+    """Solve Kepler's equation M = E - e*sin(E) for E (vectorized Newton).
+
+    Robust to e ~ 0.9 (Danby starter above e = 0.5). M is wrapped to [-pi, pi]
+    before iterating so Newton stays well-conditioned after many revolutions;
+    the returned E carries the same 2*pi revolutions as the input M.
+    """
+    m_arr = np.asarray(mean_anomaly, dtype=float)
+    e = float(eccentricity)
+    if not (0.0 <= e < 1.0) or not math.isfinite(e):
+        raise ValueError(f"solve_kepler needs eccentricity in [0, 1) (got {eccentricity!r})")
+    if e == 0.0:
+        return np.array(m_arr, dtype=float, copy=True)
+    two_pi = 2.0 * np.pi
+    revs = np.round(m_arr / two_pi)
+    m_wrap = m_arr - two_pi * revs
+    if e < 0.5:
+        ecc_anom = m_wrap + e * np.sin(m_wrap)
+    else:
+        ecc_anom = m_wrap + 0.85 * e * np.sign(m_wrap)
+    for _ in range(max_iter):
+        f = ecc_anom - e * np.sin(ecc_anom) - m_wrap
+        ecc_anom = ecc_anom - f / (1.0 - e * np.cos(ecc_anom))
+        if np.max(np.abs(f)) < tol:
+            break
+    return ecc_anom + two_pi * revs
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
 
-def _propagate(orbit: OrbitSpec, t: np.ndarray):
-    """Circular propagation. Returns (r, v) in ECI, km and km/s, shape (N, 3).
+def _mean_anomaly0(orbit: OrbitSpec, e: float) -> float:
+    """Mean anomaly at epoch from the spec's true anomaly (nu -> E -> M)."""
+    nu0 = math.radians(orbit.true_anomaly_deg)
+    ecc_anom0 = 2.0 * math.atan2(math.sqrt(1.0 - e) * math.sin(0.5 * nu0),
+                                 math.sqrt(1.0 + e) * math.cos(0.5 * nu0))
+    return ecc_anom0 - e * math.sin(ecc_anom0)
 
-    "j2" adds the secular RAAN drift only: raan_dot = -1.5*n*J2*(RE/a)^2*cos(i).
+
+def _elements_rv(a, e: float, inc: float, raan, argp, ecc_anom, n_mean):
+    """Perifocal state for eccentric anomaly E, rotated to ECI via
+    Rz(raan) @ Rx(inc) @ Rz(argp). a, raan, argp, n_mean may be scalars or
+    (N,) arrays (per-sample secular drift / SMA decay); E is (N,)."""
+    ce, se = np.cos(ecc_anom), np.sin(ecc_anom)
+    bfac = math.sqrt(1.0 - e * e)
+    one_m = 1.0 - e * ce
+    xp = a * (ce - e)
+    yp = a * bfac * se
+    # dE/dt = n / (1 - e*cosE) gives the perifocal velocity components
+    vxp = -a * n_mean * se / one_m
+    vyp = a * n_mean * bfac * ce / one_m
+    ca, sa = np.cos(argp), np.sin(argp)
+    ci, si = math.cos(inc), math.sin(inc)
+    cr, sr = np.cos(raan), np.sin(raan)
+
+    def rot(x, y):
+        x1 = x * ca - y * sa
+        y1 = x * sa + y * ca
+        px, py, pz = x1, y1 * ci, y1 * si
+        return np.stack([px * cr - py * sr, px * sr + py * cr, pz], axis=1)
+
+    return rot(xp, yp), rot(vxp, vyp)
+
+
+def _propagate(orbit: OrbitSpec, t: np.ndarray, sat: SatelliteSpec = None,
+               jd: np.ndarray = None):
+    """Propagation dispatch. Returns (r, v) in ECI, km and km/s, shape (N, 3).
+
+    "two_body": Keplerian ellipse (e = 0 reduces exactly to the validated
+        circular path).
+    "j2": ellipse + secular J2 rates, p = a(1 - e^2):
+        raan_dot = -1.5*n*J2*(RE/p)^2*cos(i)
+        argp_dot = 0.75*n*J2*(RE/p)^2*(5*cos^2(i) - 1)
+        The perigee drift is undefined for a circular orbit and is only
+        applied for e > 0 (also preserves the validated circular results).
+    "j2_drag": "j2" plus King-Hele SMA decay (needs sat ballistics).
+    "sgp4": SGP4 from a TLE (needs jd, the absolute sample times).
     """
+    if orbit.propagator == "sgp4":
+        return _propagate_sgp4(orbit, jd)
+    e = float(orbit.eccentricity)
+    if not (0.0 <= e < 1.0) or not math.isfinite(e):
+        raise ValueError(f"eccentricity must be in [0, 1) (got {orbit.eccentricity!r})")
+    if orbit.propagator == "j2_drag":
+        return _propagate_j2_drag(orbit, t, sat)
     a = orbit.semi_major_axis_km
     inc = math.radians(orbit.inclination_deg)
     n_mean = math.sqrt(MU_EARTH / a**3)
-    raan_dot = 0.0
+    raan_dot = argp_dot = 0.0
     if orbit.propagator == "j2":
-        raan_dot = -1.5 * n_mean * J2 * (R_EARTH / a) ** 2 * math.cos(inc)
+        p = a * (1.0 - e * e)
+        j2f = 1.5 * n_mean * J2 * (R_EARTH / p) ** 2
+        raan_dot = -j2f * math.cos(inc)
+        if e > 0.0:
+            argp_dot = 0.5 * j2f * (5.0 * math.cos(inc) ** 2 - 1.0)
     raan = math.radians(orbit.raan_deg) + raan_dot * t
-    u = math.radians(orbit.arg_perigee_deg + orbit.true_anomaly_deg) + n_mean * t
-    ci, si = math.cos(inc), math.sin(inc)
-    cu, su = np.cos(u), np.sin(u)
-    cr, sr = np.cos(raan), np.sin(raan)
-    # Rx(inc) applied to the in-plane vector, then Rz(raan)
-    px, py, pz = cu, su * ci, su * si
-    r = a * np.stack([px * cr - py * sr, px * sr + py * cr, pz], axis=1)
-    qx, qy, qz = -su, cu * ci, cu * si
-    v = a * n_mean * np.stack([qx * cr - qy * sr, qx * sr + qy * cr, qz], axis=1)
+    argp = math.radians(orbit.arg_perigee_deg) + argp_dot * t
+    ecc_anom = solve_kepler(_mean_anomaly0(orbit, e) + n_mean * t, e)
+    return _elements_rv(a, e, inc, raan, argp, ecc_anom, n_mean)
+
+
+def _propagate_j2_drag(orbit: OrbitSpec, t: np.ndarray, sat: SatelliteSpec):
+    """Elliptical J2 propagation with orbit-averaged drag SMA decay
+    (see _mean_decay_rate_km_s: circular King-Hele at e = 0, Gauss variational
+    average over eccentric anomaly for e > 0, so the perigee air is captured):
+        F = (1 - omega_E*cos(i)/n)^2   (atmosphere co-rotation factor: a
+            retrograde orbit meets the rotating air head-on and decays faster)
+    integrated per sampling step. Eccentricity is held fixed (real drag decay
+    also circularizes the orbit), so eccentric results stay coarse.
+    """
+    if sat is None or sat.mass_kg <= 0.0 or sat.drag_area_m2 <= 0.0:
+        raise ValueError(
+            "propagator 'j2_drag' requires mass_kg > 0 and drag_area_m2 > 0 "
+            "on the SatelliteSpec")
+    e = float(orbit.eccentricity)
+    inc = math.radians(orbit.inclination_deg)
+    ci = math.cos(inc)
+    bc = sat.drag_coefficient * sat.drag_area_m2 / sat.mass_kg  # m^2/kg
+    n_samples = t.shape[0]
+    a_arr = np.empty(n_samples)
+    m_arr = np.empty(n_samples)
+    raan_arr = np.empty(n_samples)
+    argp_arr = np.empty(n_samples)
+    a = orbit.semi_major_axis_km
+    m_anom = _mean_anomaly0(orbit, e)
+    raan = math.radians(orbit.raan_deg)
+    argp = math.radians(orbit.arg_perigee_deg)
+    for k in range(n_samples):
+        a_arr[k] = a
+        m_arr[k] = m_anom
+        raan_arr[k] = raan
+        argp_arr[k] = argp
+        if k + 1 < n_samples:
+            dt_k = t[k + 1] - t[k]
+            n_k = math.sqrt(MU_EARTH / a**3)
+            p = a * (1.0 - e * e)
+            j2f = 1.5 * n_k * J2 * (R_EARTH / p) ** 2
+            raan += -j2f * ci * dt_k
+            if e > 0.0:
+                argp += 0.5 * j2f * (5.0 * ci * ci - 1.0) * dt_k
+            co_rot = (1.0 - OMEGA_EARTH * ci / n_k) ** 2
+            a += _mean_decay_rate_km_s(a, e, bc, co_rot) * dt_k
+            m_anom += n_k * dt_k
+            if a * (1.0 - e) - R_EARTH < 100.0:
+                raise ValueError(
+                    f"'j2_drag': orbit decays below 100 km within the window "
+                    f"(t ~ {t[k + 1]:.0f} s); use estimate_lifetime() for decay studies")
+    ecc_anom = solve_kepler(m_arr, e)
+    n_arr = np.sqrt(MU_EARTH / a_arr**3)
+    return _elements_rv(a_arr, e, inc, raan_arr, argp_arr, ecc_anom, n_arr)
+
+
+def _propagate_sgp4(orbit: OrbitSpec, jd: np.ndarray):
+    """SGP4 propagation from the spec's TLE at absolute times jd (Julian dates).
+
+    TEME output is used directly as the pseudo-ECI frame: TEME vs GCRS differs
+    by a <0.01-deg-scale frame rotation — acceptable at Phase A/B fidelity for
+    eclipse/power/pass purposes, NOT for precision pointing.
+    """
+    try:
+        from sgp4.api import Satrec
+    except ImportError:
+        raise ValueError("propagator 'sgp4' requires the sgp4 package (pip install sgp4)")
+    if not orbit.tle_line1 or not orbit.tle_line2:
+        raise ValueError("propagator 'sgp4' requires tle_line1 and tle_line2 on the OrbitSpec")
+    if jd is None:
+        raise ValueError("propagator 'sgp4' needs absolute sample times (jd)")
+    satrec = Satrec.twoline2rv(orbit.tle_line1, orbit.tle_line2)
+    jd_arr = np.asarray(jd, dtype=float)
+    # TLE accuracy degrades within days-to-weeks: a stale TLE propagates
+    # without error codes but the state can be badly off — warn, don't fail.
+    epoch_jd = satrec.jdsatepoch + satrec.jdsatepochF
+    gap_days = float(np.max(np.abs(jd_arr - epoch_jd)))
+    if gap_days > 30.0:
+        warnings.warn(
+            f"SGP4: the analysis window is {gap_days:.0f} days from the TLE "
+            f"epoch — TLE accuracy degrades within days-to-weeks, use a "
+            f"fresher TLE", UserWarning, stacklevel=2)
+    jd_base = np.floor(jd_arr - 0.5) + 0.5  # split for sgp4's two-part time
+    fr = jd_arr - jd_base
+    err, r, v = satrec.sgp4_array(jd_base, fr)
+    if np.any(err != 0):
+        codes = sorted({int(c) for c in err[err != 0]})
+        raise ValueError(f"SGP4 propagation failed with error code(s) {codes}")
     return r, v
+
+
+def estimate_lifetime(sat: SatelliteSpec, start_utc, max_years: float = 25.0):
+    """Coarse orbital-lifetime estimate [years], or None past max_years.
+
+    Integrates the same orbit-averaged drag SMA decay as the 'j2_drag'
+    propagator (_mean_decay_rate_km_s: for e > 0 the density is averaged along
+    the true radius, so the perigee air is captured) with adaptive steps
+    (1-day cap, shrinking to keep decay under ~1 km per step) until the
+    perigee altitude a*(1-e) - RE drops below 120 km. The exponential
+    atmosphere is static, so start_utc only anchors the epoch semantics.
+    Eccentricity is held fixed (real drag decay also circularizes the orbit),
+    so eccentric estimates stay coarse.
+    """
+    if sat.mass_kg <= 0.0 or sat.drag_area_m2 <= 0.0:
+        raise ValueError("estimate_lifetime requires mass_kg > 0 and drag_area_m2 > 0")
+    e = float(sat.orbit.eccentricity)
+    if not (0.0 <= e < 1.0) or not math.isfinite(e):
+        raise ValueError(f"eccentricity must be in [0, 1) (got {sat.orbit.eccentricity!r})")
+    a = sat.orbit.semi_major_axis_km
+    ci = math.cos(math.radians(sat.orbit.inclination_deg))
+    bc = sat.drag_coefficient * sat.drag_area_m2 / sat.mass_kg
+    year_s = 365.25 * 86400.0
+    limit_s = max_years * year_s
+    elapsed = 0.0
+    while elapsed < limit_s:
+        if a * (1.0 - e) - R_EARTH < 120.0:
+            return elapsed / year_s
+        n_mean = math.sqrt(MU_EARTH / a**3)
+        co_rot = (1.0 - OMEGA_EARTH * ci / n_mean) ** 2
+        da_dt = _mean_decay_rate_km_s(a, e, bc, co_rot)  # km/s
+        dt = min(86400.0, max(60.0, 1.0 / max(abs(da_dt), 1e-30)))
+        a += da_dt * dt
+        elapsed += dt
+    return None
+
+
+def loads_from_equipment(items: list) -> list:
+    """Map equipment rows ({"name", "power_w", "qty"}) to always-on LoadSpecs.
+
+    power_w is scaled by qty (default 1). Rows with a missing name, a
+    non-numeric value, or a non-positive total power are skipped. Pure helper
+    for the UI interconnect — testable without streamlit.
+    """
+    loads: list[LoadSpec] = []
+    for item in items:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            power = float(item.get("power_w", 0.0) or 0.0)
+            qty_raw = item.get("qty", 1)
+            qty = 1 if qty_raw is None else int(qty_raw)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(power) or power <= 0.0:
+            continue
+        total = power * qty
+        if not math.isfinite(total) or total <= 0.0:
+            continue
+        loads.append(LoadSpec(name=name, power_w=total, when="always"))
+    return loads
 
 
 def _normalize_rows(m: np.ndarray) -> np.ndarray:
@@ -326,7 +649,7 @@ def analyze(spec: MissionSpec) -> MissionResult:
 
     sat_results: list[SatResult] = []
     for sat in spec.satellites:
-        r, v = _propagate(sat.orbit, t)
+        r, v = _propagate(sat.orbit, t, sat, jd_arr)
         r_norm = np.linalg.norm(r, axis=1)
         r_hat = r / r_norm[:, None]
 
@@ -426,8 +749,11 @@ def analyze(spec: MissionSpec) -> MissionResult:
                 ))
         passes.sort(key=lambda p: p.aos)
 
-        # links (worst case at the lowest station minimum elevation)
-        altitude_km = sat.orbit.semi_major_axis_km - R_EARTH
+        # links: worst case at the lowest station minimum elevation, at the
+        # highest altitude the PROPAGATED trajectory actually reaches (apogee).
+        # Using the spec SMA here was optimistic for eccentric orbits and was
+        # disconnected from the TLE under the sgp4 propagator.
+        altitude_km = float(np.max(r_norm)) - R_EARTH
         link_results = [_link_result(lk, altitude_km, link_elev_deg) for lk in sat.links]
 
         # beta angle at epoch (orbit normal vs Sun)

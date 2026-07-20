@@ -328,7 +328,12 @@ _MISSION_DATA_KEYS = [
     "warehouse_items", "procurement_orders", "mission_phase", "mission_framework",
     "orb_alt", "orb_inc", "orb_ecc", "orb_raan", "orb_aop", "orb_mass", "orb_area", "orb_epoch",
     "team_members", "fmeca_entries", "propellant_kg",
+    "msim_saved_spec",
 ]
+# Session-only Mission Analysis artifacts (results, live spec, lifetime metric,
+# budget-injected loads table): never persisted per mission, must be dropped on
+# every mission switch or mission B displays mission A's results/loads.
+_MSIM_TRANSIENT_KEYS = ("msim_result", "msim_spec", "msim_lifetime", "msim_loads_df", "msim_gs_df")
 # Ensure mission state exists
 if "missions" not in st.session_state:
     st.session_state.missions = {}
@@ -954,6 +959,8 @@ def _activate_local_mission(mission_id: str, mission: dict) -> None:
     st.session_state.active_mission_id = mission_id
     st.session_state["_loaded_mission_id"] = mission_id
     st.session_state.missions[mission_id] = mission
+    for key in _MSIM_TRANSIENT_KEYS:
+        st.session_state.pop(key, None)
     for key in _MISSION_DATA_KEYS:
         if key in mission:
             st.session_state[key] = mission[key]
@@ -964,7 +971,10 @@ def _load_mission(mid: str):
     if not mid:
         return
     st.session_state.active_mission_id = mid
-    
+    # session-only Mission Analysis artifacts must not survive a mission switch
+    for key in _MSIM_TRANSIENT_KEYS:
+        st.session_state.pop(key, None)
+
     # Try to load from DB if DB is enforced
     if DB_ENFORCED:
         try:
@@ -972,9 +982,28 @@ def _load_mission(mid: str):
             if data:
                 for key, val in data.items():
                     if key == "missions":
-                        st.session_state.missions.update(val)
+                        # merge instead of replace: _save_current_mission
+                        # snapshots session-only keys (e.g. msim_saved_spec)
+                        # into this dict — a plain replace would destroy them
+                        for _mid, _row in val.items():
+                            existing = st.session_state.missions.get(_mid)
+                            if isinstance(existing, dict):
+                                existing.update(_row)
+                            else:
+                                st.session_state.missions[_mid] = _row
                     else:
                         st.session_state[key] = val
+                # keys the DB payload does not carry: restore them from the
+                # mission snapshot (mirroring _activate_local_mission) or clear
+                # them, otherwise they silently leak from the previous mission
+                mission = st.session_state.missions.get(mid) or {}
+                for key in _MISSION_DATA_KEYS:
+                    if key in data:
+                        continue
+                    if key in mission:
+                        st.session_state[key] = mission[key]
+                    elif key in st.session_state:
+                        del st.session_state[key]
                 st.session_state["_loaded_mission_id"] = mid
                 return
             st.error("🚫 Database mission load failed: no mission data returned from DB.")
@@ -8264,7 +8293,8 @@ def page_mission_analysis():
     from bepi.integrations.mission_sim import (
         OrbitSpec, SolarFace, BatterySpec, LoadSpec, LinkSpec,
         GroundStationSpec, SatelliteSpec, MissionSpec,
-        analyze, walker_delta, sweep, sensitivity, R_EARTH,
+        analyze, walker_delta, sweep, sensitivity, R_EARTH, MU_EARTH,
+        estimate_lifetime, loads_from_equipment,
     )
 
     colored_header(
@@ -8273,6 +8303,63 @@ def page_mission_analysis():
                     "battery SoC -> link -> passes. Cross-checked against GMAT-validated references.",
         color_name="light-blue-70",
     )
+
+    # Per-mission saved inputs (snapshot/restored on mission switch via
+    # _MISSION_DATA_KEYS): used as widget DEFAULTS — within a session the live
+    # widget state wins, which is the intended streamlit behaviour.
+    saved = st.session_state.get("msim_saved_spec") or {}
+    if saved:
+        _rs1, _rs2 = st.columns([5, 1])
+        _rs1.caption("Input defaults come from this mission's last run — Reset "
+                     "re-syncs them with the active mission phase.")
+        if _rs2.button("↺ Reset inputs", key="msim_reset_inputs",
+                       help="Clear the saved inputs and re-derive the defaults "
+                            "from the mission phase (orbit altitude/inclination)."):
+            for _k in list(st.session_state.keys()):
+                # drop saved spec + input-widget state; keep the last results
+                if (str(_k).startswith("msim_")
+                        and _k not in ("msim_result", "msim_spec", "msim_lifetime")):
+                    del st.session_state[_k]
+            st.rerun()
+
+    def _equipment_rows(mode_id=None):
+        """Equipment {name, power_w, qty, mass} rows from the mission budget.
+        Defensive: handles the dict-of-dicts form (code -> {...}) and a list
+        form; power taken from power_by_mode[mode_id] when available."""
+        try:
+            eb = _get_equip_budgets() or {}
+        except Exception:
+            eb = st.session_state.get("equip_budgets") or {}
+        names = {n.get("code"): n.get("name")
+                 for n in (st.session_state.get("product_tree") or [])
+                 if isinstance(n, dict) and n.get("code")}
+        if isinstance(eb, dict):
+            items = list(eb.items())
+        elif isinstance(eb, list):
+            items = [(e.get("code") or e.get("name") or "", e)
+                     for e in eb if isinstance(e, dict)]
+        else:
+            items = []
+        rows = []
+        for code, entry in items:
+            if not isinstance(entry, dict):
+                continue
+            power = entry.get("power", 0.0)
+            if mode_id is not None:
+                by_mode = entry.get("power_by_mode")
+                if isinstance(by_mode, dict) and str(mode_id) in by_mode:
+                    power = by_mode[str(mode_id)]
+            rows.append({"name": names.get(code) or str(code or ""),
+                         "power_w": power, "qty": entry.get("qty", 1),
+                         "mass": entry.get("mass", 0.0)})
+        return rows
+
+    _mass_rollup = 0.0
+    for _er in _equipment_rows():
+        try:
+            _mass_rollup += float(_er["mass"] or 0.0) * float(_er["qty"] or 1)
+        except (TypeError, ValueError):
+            continue
 
     _SWEEP_PARAMS = ["altitude_km", "inclination_deg", "battery_capacity_wh",
                      "tx_power_w", "data_rate_bps", "solar_area_scale", "years_since_bol"]
@@ -8289,54 +8376,159 @@ def page_mission_analysis():
 
     # ── Spec ─────────────────────────────────────────────────────
     with st.expander("🛰️ **Orbit & analysis window**", expanded=True):
-        oc1, oc2, oc3 = st.columns(3)
+        op1, op2, op3 = st.columns(3)
+        _prop_opts = ["two_body", "j2", "j2_drag", "sgp4"]
+        _prop_saved = saved.get("propagator", "j2")
+        propagator = op1.selectbox(
+            "Propagator", _prop_opts,
+            index=_prop_opts.index(_prop_saved) if _prop_saved in _prop_opts else 1,
+            key="msim_prop")
+        _point_opts = ["nadir", "sun"]
+        _point_saved = saved.get("pointing", "nadir")
+        pointing = op2.selectbox(
+            "Pointing mode", _point_opts,
+            index=_point_opts.index(_point_saved) if _point_saved in _point_opts else 0,
+            key="msim_pointing")
+        years_bol = op3.number_input("Years since BOL", 0.0, 25.0,
+                                     float(saved.get("years_bol", 0.0)), key="msim_years")
+        is_sgp4 = propagator == "sgp4"
+        oc1, oc2, oc3, oc4, oc5 = st.columns(5)
         # phase selection writes orb_alt/orb_inc unclamped (e.g. lunar 100 km LLO):
         # clamp the defaults into the widget bounds or number_input raises on render
-        _alt_default = min(50000.0, max(200.0, float(st.session_state.get("orb_alt", 500))))
-        _inc_default = min(180.0, max(0.0, float(st.session_state.get("orb_inc", 97.4))))
-        alt_km = oc1.number_input("Altitude (km)", 200.0, 50000.0, _alt_default, key="msim_alt")
-        inc_deg = oc2.number_input("Inclination (°)", 0.0, 180.0, _inc_default, key="msim_inc")
-        raan_deg = oc3.number_input("RAAN (°)", 0.0, 360.0, 0.0, key="msim_raan")
-        oc4, oc5, oc6 = st.columns(3)
-        propagator = oc4.selectbox("Propagator", ["j2", "two_body"], key="msim_prop")
-        pointing = oc5.selectbox("Pointing mode", ["nadir", "sun"], key="msim_pointing")
-        years_bol = oc6.number_input("Years since BOL", 0.0, 25.0, 0.0, key="msim_years")
+        _alt_default = min(50000.0, max(200.0, float(saved.get("alt_km", st.session_state.get("orb_alt", 500)))))
+        _inc_default = min(180.0, max(0.0, float(saved.get("inc_deg", st.session_state.get("orb_inc", 97.4)))))
+        _raan_default = min(360.0, max(0.0, float(saved.get("raan_deg", st.session_state.get("orb_raan", 0.0) or 0.0))))
+        _ecc_default = min(0.9, max(0.0, float(saved.get("ecc", st.session_state.get("orb_ecc", 0.0) or 0.0))))
+        _aop_default = min(360.0, max(0.0, float(saved.get("aop_deg", st.session_state.get("orb_aop", 0.0) or 0.0))))
+        alt_km = oc1.number_input("Altitude (km)", 200.0, 50000.0, _alt_default,
+                                  key="msim_alt", disabled=is_sgp4)
+        inc_deg = oc2.number_input("Inclination (°)", 0.0, 180.0, _inc_default,
+                                   key="msim_inc", disabled=is_sgp4)
+        raan_deg = oc3.number_input("RAAN (°)", 0.0, 360.0, _raan_default,
+                                    key="msim_raan", disabled=is_sgp4)
+        ecc = oc4.number_input("Eccentricity", 0.0, 0.9, _ecc_default, step=0.01,
+                               format="%.3f", key="msim_ecc", disabled=is_sgp4)
+        aop_deg = oc5.number_input("Arg. perigee (°)", 0.0, 360.0, _aop_default,
+                                   key="msim_aop", disabled=is_sgp4)
+        tle_text = ""
+        drag_mass, drag_area, drag_cd = 0.0, 0.0, 2.2
+        if propagator == "j2_drag":
+            dg1, dg2, dg3 = st.columns(3)
+            # 0/missing saved value falls back to the mission mass rollup
+            _mass_default = float(saved.get("drag_mass_kg") or _mass_rollup or 0.0)
+            drag_mass = dg1.number_input("Mass (kg)", 0.0, 100000.0, _mass_default,
+                                         key="msim_drag_mass")
+            _area_default = float(saved.get("drag_area_m2")
+                                  or st.session_state.get("orb_area") or 0.01)
+            drag_area = dg2.number_input("Drag area (m²)", 0.0, 1000.0, _area_default,
+                                         step=0.01, format="%.4f", key="msim_drag_area")
+            drag_cd = dg3.number_input("Cd", 0.5, 5.0,
+                                       float(saved.get("drag_cd") or 2.2),
+                                       key="msim_drag_cd")
+        elif is_sgp4:
+            tle_text = st.text_area(
+                "TLE (2 lines)", value=str(saved.get("tle_text", "")), height=80,
+                key="msim_tle",
+                placeholder="1 25544U 98067A   26200.50000000  .00016717  00000-0  10270-3 0  9005\n"
+                            "2 25544  51.6400 208.9163 0006317  69.9862 290.2553 15.49560000    05")
+            st.caption("SGP4 propagates from the TLE — the Keplerian fields above are ignored.")
         od1, od2, od3, od4 = st.columns(4)
-        start_date = od1.date_input("Start date (UTC)", date(2026, 7, 20), key="msim_start_date")
-        start_time = od2.time_input("Start time (UTC)", dtime(8, 27, 38), key="msim_start_time")
-        duration_h = od3.number_input("Duration (h)", 1.0, 720.0, 48.0, key="msim_dur")
-        step_s = od4.number_input("Step (s)", 1.0, 600.0, 30.0, key="msim_step")
+        _sd_default, _st_default = date(2026, 7, 20), dtime(8, 27, 38)
+        try:
+            if saved.get("start_date"):
+                _sd_default = date.fromisoformat(saved["start_date"])
+            if saved.get("start_time"):
+                _st_default = dtime.fromisoformat(saved["start_time"])
+        except (TypeError, ValueError):
+            pass
+        start_date = od1.date_input("Start date (UTC)", _sd_default, key="msim_start_date")
+        start_time = od2.time_input("Start time (UTC)", _st_default, key="msim_start_time")
+        duration_h = od3.number_input("Duration (h)", 1.0, 720.0,
+                                      float(saved.get("duration_h", 48.0)), key="msim_dur")
+        step_s = od4.number_input("Step (s)", 1.0, 600.0,
+                                  float(saved.get("step_s", 30.0)), key="msim_step")
 
     with st.expander("☀️ **Solar & battery**"):
         st.caption("Face normals in body frame — nadir: +Z zenith, +X along-track; sun-pointing: +X toward the Sun.")
+        _faces_default = pd.DataFrame([
+            {"Name": "+X", "Area (m²)": 0.02, "nx": 1.0, "ny": 0.0, "nz": 0.0},
+            {"Name": "-X", "Area (m²)": 0.02, "nx": -1.0, "ny": 0.0, "nz": 0.0},
+            {"Name": "+Y", "Area (m²)": 0.02, "nx": 0.0, "ny": 1.0, "nz": 0.0},
+            {"Name": "-Y", "Area (m²)": 0.02, "nx": 0.0, "ny": -1.0, "nz": 0.0},
+            {"Name": "+Z", "Area (m²)": 0.01, "nx": 0.0, "ny": 0.0, "nz": 1.0},
+        ])
+        if saved.get("faces_rows"):
+            try:
+                _faces_default = pd.DataFrame(saved["faces_rows"])
+            except Exception:
+                pass
         faces_edit = st.data_editor(
-            pd.DataFrame([
-                {"Name": "+X", "Area (m²)": 0.02, "nx": 1.0, "ny": 0.0, "nz": 0.0},
-                {"Name": "-X", "Area (m²)": 0.02, "nx": -1.0, "ny": 0.0, "nz": 0.0},
-                {"Name": "+Y", "Area (m²)": 0.02, "nx": 0.0, "ny": 1.0, "nz": 0.0},
-                {"Name": "-Y", "Area (m²)": 0.02, "nx": 0.0, "ny": -1.0, "nz": 0.0},
-                {"Name": "+Z", "Area (m²)": 0.01, "nx": 0.0, "ny": 0.0, "nz": 1.0},
-            ]),
+            _faces_default,
             num_rows="dynamic", hide_index=True, width="stretch", key="msim_faces")
         sc1, sc2 = st.columns(2)
-        efficiency = sc1.number_input("Cell efficiency", 0.05, 0.5, 0.3, step=0.01, key="msim_eff")
-        degradation = sc2.number_input("Degradation per year", 0.0, 0.2, 0.025, step=0.005,
+        efficiency = sc1.number_input("Cell efficiency", 0.05, 0.5,
+                                      float(saved.get("efficiency", 0.3)), step=0.01, key="msim_eff")
+        degradation = sc2.number_input("Degradation per year", 0.0, 0.2,
+                                       float(saved.get("degradation", 0.025)), step=0.005,
                                        format="%.3f", key="msim_degr")
         bc1, bc2, bc3, bc4, bc5 = st.columns(5)
-        batt_cap = bc1.number_input("Capacity (Wh)", 1.0, 10000.0, 30.0, key="msim_batt_cap")
-        batt_min = bc2.number_input("Min SoC", 0.0, 0.9, 0.3, step=0.05, key="msim_batt_min")
-        batt_max = bc3.number_input("Max SoC", 0.1, 1.0, 1.0, step=0.05, key="msim_batt_max")
-        batt_init = bc4.number_input("Initial SoC", 0.0, 1.0, 0.8, step=0.05, key="msim_batt_init")
-        batt_rte = bc5.number_input("Round-trip eff.", 0.5, 1.0, 0.9, step=0.01, key="msim_batt_rte")
+        batt_cap = bc1.number_input("Capacity (Wh)", 1.0, 10000.0,
+                                    float(saved.get("batt_cap", 30.0)), key="msim_batt_cap")
+        batt_min = bc2.number_input("Min SoC", 0.0, 0.9,
+                                    float(saved.get("batt_min", 0.3)), step=0.05, key="msim_batt_min")
+        batt_max = bc3.number_input("Max SoC", 0.1, 1.0,
+                                    float(saved.get("batt_max", 1.0)), step=0.05, key="msim_batt_max")
+        batt_init = bc4.number_input("Initial SoC", 0.0, 1.0,
+                                     float(saved.get("batt_init", 0.8)), step=0.05, key="msim_batt_init")
+        batt_rte = bc5.number_input("Round-trip eff.", 0.5, 1.0,
+                                    float(saved.get("batt_rte", 0.9)), step=0.01, key="msim_batt_rte")
 
     with st.expander("🔌 **Loads**"):
+        _loads_default = pd.DataFrame([
+            {"Name": "OBC + EPS", "Power (W)": 1.2, "When": "always", "Station": ""},
+            {"Name": "ADCS", "Power (W)": 1.0, "When": "sunlit", "Station": ""},
+            {"Name": "Heaters", "Power (W)": 1.5, "When": "eclipse", "Station": ""},
+            {"Name": "S-band TX", "Power (W)": 4.0, "When": "pass", "Station": ""},
+        ])
+        if saved.get("loads_rows"):
+            try:
+                _loads_default = pd.DataFrame(saved["loads_rows"])
+            except Exception:
+                pass
+        # rows injected by "Load from mission budget" take precedence
+        if st.session_state.get("msim_loads_df") is not None:
+            _loads_default = st.session_state["msim_loads_df"]
+        lb1, lb2 = st.columns(2)
+        _eb_state = st.session_state.get("equip_budgets") or {}
+        if isinstance(_eb_state, dict):
+            _eb_entries = list(_eb_state.values())
+        elif isinstance(_eb_state, list):
+            _eb_entries = [e for e in _eb_state if isinstance(e, dict)]
+        else:
+            _eb_entries = []
+        _modes = st.session_state.get("operating_modes") or []
+        _mode_id = None
+        if _modes and any(isinstance(e, dict) and e.get("power_by_mode") for e in _eb_entries):
+            _mode_names = [str(m.get("name", "?")) for m in _modes if isinstance(m, dict)]
+            _mode_sel = lb2.selectbox("Operating mode (for budget load)", _mode_names,
+                                      key="msim_load_mode")
+            _mode_id = next((m.get("id") for m in _modes
+                             if isinstance(m, dict) and str(m.get("name", "?")) == _mode_sel),
+                            None)
+        if lb1.button("Load from mission budget", key="msim_loads_from_budget",
+                      help="Fill the loads table from the equipment power budget "
+                           "(power × qty, always-on)."):
+            _budget_loads = loads_from_equipment(_equipment_rows(_mode_id))
+            if _budget_loads:
+                st.session_state["msim_loads_df"] = pd.DataFrame(
+                    [{"Name": l.name, "Power (W)": l.power_w, "When": "always", "Station": ""}
+                     for l in _budget_loads])
+                st.session_state.pop("msim_loads", None)  # reset editor edit-state
+                st.rerun()
+            else:
+                st.info("No equipment power budget found for this mission")
         loads_edit = st.data_editor(
-            pd.DataFrame([
-                {"Name": "OBC + EPS", "Power (W)": 1.2, "When": "always", "Station": ""},
-                {"Name": "ADCS", "Power (W)": 1.0, "When": "sunlit", "Station": ""},
-                {"Name": "Heaters", "Power (W)": 1.5, "When": "eclipse", "Station": ""},
-                {"Name": "S-band TX", "Power (W)": 4.0, "When": "pass", "Station": ""},
-            ]),
+            _loads_default,
             num_rows="dynamic", hide_index=True, width="stretch",
             column_config={
                 "When": st.column_config.SelectboxColumn(
@@ -8348,37 +8540,79 @@ def page_mission_analysis():
 
     with st.expander("📡 **Link (downlink budget)**"):
         lk1, lk2, lk3, lk4 = st.columns(4)
-        link_freq_mhz = lk1.number_input("Frequency (MHz)", 100.0, 40000.0, 2245.0, key="msim_lk_freq")
-        link_tx_w = lk2.number_input("TX power (W)", 0.01, 1000.0, 2.0, key="msim_lk_txw")
-        link_tx_gain = lk3.number_input("TX antenna gain (dBi)", -10.0, 60.0, 6.5, key="msim_lk_txg")
-        link_rx_gain = lk4.number_input("RX antenna gain (dBi)", -10.0, 80.0, 32.0, key="msim_lk_rxg")
+        link_freq_mhz = lk1.number_input("Frequency (MHz)", 100.0, 40000.0,
+                                         float(saved.get("lk_freq", 2245.0)), key="msim_lk_freq")
+        link_tx_w = lk2.number_input("TX power (W)", 0.01, 1000.0,
+                                     float(saved.get("lk_txw", 2.0)), key="msim_lk_txw")
+        link_tx_gain = lk3.number_input("TX antenna gain (dBi)", -10.0, 60.0,
+                                        float(saved.get("lk_txg", 6.5)), key="msim_lk_txg")
+        link_rx_gain = lk4.number_input("RX antenna gain (dBi)", -10.0, 80.0,
+                                        float(saved.get("lk_rxg", 32.0)), key="msim_lk_rxg")
         lk5, lk6, lk7, lk8 = st.columns(4)
-        link_tx_loss = lk5.number_input("TX line loss (dB)", 0.0, 20.0, 1.0, key="msim_lk_txl")
-        link_rx_loss = lk6.number_input("RX line loss (dB)", 0.0, 20.0, 0.5, key="msim_lk_rxl")
-        link_tsys = lk7.number_input("System noise temp (K)", 10.0, 5000.0, 220.0, key="msim_lk_tsys")
-        link_rate = lk8.number_input("Data rate (bps)", 100.0, 1e9, 256000.0, key="msim_lk_rate")
+        link_tx_loss = lk5.number_input("TX line loss (dB)", 0.0, 20.0,
+                                        float(saved.get("lk_txl", 1.0)), key="msim_lk_txl")
+        link_rx_loss = lk6.number_input("RX line loss (dB)", 0.0, 20.0,
+                                        float(saved.get("lk_rxl", 0.5)), key="msim_lk_rxl")
+        link_tsys = lk7.number_input("System noise temp (K)", 10.0, 5000.0,
+                                     float(saved.get("lk_tsys", 220.0)), key="msim_lk_tsys")
+        link_rate = lk8.number_input("Data rate (bps)", 100.0, 1e9,
+                                     float(saved.get("lk_rate", 256000.0)), key="msim_lk_rate")
         lk9, lk10, lk11, lk12 = st.columns(4)
-        link_ebn0 = lk9.number_input("Required Eb/N0 (dB)", 0.0, 30.0, 9.6, key="msim_lk_ebn0")
-        link_pol = lk10.number_input("Polarization loss (dB)", 0.0, 10.0, 0.5, key="msim_lk_pol")
-        link_point = lk11.number_input("Pointing loss (dB)", 0.0, 10.0, 0.5, key="msim_lk_point")
-        link_atm = lk12.number_input("Atmospheric loss (dB)", 0.0, 20.0, 0.5, key="msim_lk_atm")
+        link_ebn0 = lk9.number_input("Required Eb/N0 (dB)", 0.0, 30.0,
+                                     float(saved.get("lk_ebn0", 9.6)), key="msim_lk_ebn0")
+        link_pol = lk10.number_input("Polarization loss (dB)", 0.0, 10.0,
+                                     float(saved.get("lk_pol", 0.5)), key="msim_lk_pol")
+        link_point = lk11.number_input("Pointing loss (dB)", 0.0, 10.0,
+                                       float(saved.get("lk_point", 0.5)), key="msim_lk_point")
+        link_atm = lk12.number_input("Atmospheric loss (dB)", 0.0, 20.0,
+                                     float(saved.get("lk_atm", 0.5)), key="msim_lk_atm")
 
     with st.expander("🌍 **Ground stations**"):
+        _stations_default = pd.DataFrame([
+            {"Name": "Padova GS", "Lat (°)": 45.406, "Lon (°)": 11.876,
+             "Alt (m)": 12.0, "Min elev (°)": 10.0},
+        ])
+        if saved.get("stations_rows"):
+            try:
+                _stations_default = pd.DataFrame(saved["stations_rows"])
+            except Exception:
+                pass
+        # rows injected by "Add from ESA network" take precedence (same
+        # mechanism as the budget-injected loads table)
+        if st.session_state.get("msim_gs_df") is not None:
+            _stations_default = st.session_state["msim_gs_df"]
+        from bepi.integrations.gmat import COMMON_GROUND_STATIONS as _COMMON_GS
+        _gs_pick = st.multiselect(
+            "Add from ESA network (shared with Integrations)",
+            list(_COMMON_GS.keys()), key="msim_gs_pick")
+        if st.button("➕ Add selected stations", key="msim_gs_add", disabled=not _gs_pick):
+            _cur = _stations_default.to_dict("records")
+            _have = {str(r.get("Name", "")) for r in _cur}
+            for _n in _gs_pick:
+                _g = _COMMON_GS[_n]
+                if _g.name not in _have:
+                    _cur.append({"Name": _g.name, "Lat (°)": _g.lat_deg,
+                                 "Lon (°)": _g.lon_deg, "Alt (m)": _g.alt_m,
+                                 "Min elev (°)": getattr(_g, "min_elevation_deg", 10.0)})
+            st.session_state["msim_gs_df"] = pd.DataFrame(_cur)
+            st.session_state.pop("msim_stations", None)
+            st.rerun()
         stations_edit = st.data_editor(
-            pd.DataFrame([
-                {"Name": "Padova GS", "Lat (°)": 45.406, "Lon (°)": 11.876,
-                 "Alt (m)": 12.0, "Min elev (°)": 10.0},
-            ]),
+            _stations_default,
             num_rows="dynamic", hide_index=True, width="stretch", key="msim_stations")
 
     with st.expander("🛰️🛰️ **Constellation**"):
-        use_walker = st.checkbox("Walker delta constellation", value=False, key="msim_walker")
+        use_walker = st.checkbox("Walker delta constellation",
+                                 value=bool(saved.get("use_walker", False)), key="msim_walker")
         wc1, wc2, wc3 = st.columns(3)
-        walker_t = wc1.number_input("Total satellites (T)", 1, 120, 6, key="msim_walker_t",
+        walker_t = wc1.number_input("Total satellites (T)", 1, 120,
+                                    int(saved.get("walker_t", 6)), key="msim_walker_t",
                                     disabled=not use_walker)
-        walker_p = wc2.number_input("Planes (P)", 1, 24, 3, key="msim_walker_p",
+        walker_p = wc2.number_input("Planes (P)", 1, 24,
+                                    int(saved.get("walker_p", 3)), key="msim_walker_p",
                                     disabled=not use_walker)
-        walker_f = wc3.number_input("Phasing (F)", 0, 24, 1, key="msim_walker_f",
+        walker_f = wc3.number_input("Phasing (F)", 0, 24,
+                                    int(saved.get("walker_f", 1)), key="msim_walker_f",
                                     disabled=not use_walker)
 
     # ── Build spec & run ─────────────────────────────────────────
@@ -8433,15 +8667,39 @@ def page_mission_analysis():
             data_rate_bps=link_rate, required_eb_n0_db=link_ebn0,
             polarization_loss_db=link_pol, pointing_loss_db=link_point,
             atmospheric_loss_db=link_atm)
+        orbit_kwargs = dict(
+            semi_major_axis_km=R_EARTH + alt_km, inclination_deg=inc_deg,
+            raan_deg=raan_deg, arg_perigee_deg=aop_deg, eccentricity=ecc,
+            propagator=propagator)
+        if propagator == "sgp4":
+            _tle_lines = [ln.strip() for ln in (tle_text or "").splitlines() if ln.strip()]
+            orbit_kwargs["tle_line1"] = _tle_lines[0] if len(_tle_lines) > 0 else ""
+            orbit_kwargs["tle_line2"] = _tle_lines[1] if len(_tle_lines) > 1 else ""
+            # The Keplerian widgets are disabled (and stale) under SGP4 — the
+            # caption promises they are ignored, so honor it: derive the spec
+            # reference elements from the TLE itself (line-2 fixed columns)
+            # instead of whatever the widgets last held. Malformed TLEs fall
+            # through: analyze() raises its own clear error.
+            if len(_tle_lines) > 1:
+                try:
+                    _l2 = _tle_lines[1]
+                    _n_rad_s = float(_l2[52:63]) * 2.0 * np.pi / 86400.0  # rev/day
+                    orbit_kwargs["semi_major_axis_km"] = (MU_EARTH / _n_rad_s**2) ** (1.0 / 3.0)
+                    orbit_kwargs["eccentricity"] = float("0." + _l2[26:33].strip())
+                    orbit_kwargs["inclination_deg"] = float(_l2[8:16])
+                    orbit_kwargs["raan_deg"] = float(_l2[17:25])
+                    orbit_kwargs["arg_perigee_deg"] = float(_l2[34:42])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
         base_sat = SatelliteSpec(
             name="SAT",
-            orbit=OrbitSpec(semi_major_axis_km=R_EARTH + alt_km, inclination_deg=inc_deg,
-                            raan_deg=raan_deg, propagator=propagator),
+            orbit=OrbitSpec(**orbit_kwargs),
             pointing_mode=pointing, faces=faces, efficiency=efficiency,
             degradation_per_year=degradation,
             battery=BatterySpec(capacity_wh=batt_cap, min_soc=batt_min, max_soc=batt_max,
                                 initial_soc=batt_init, round_trip_efficiency=batt_rte),
-            loads=loads, links=[link])
+            loads=loads, links=[link],
+            mass_kg=drag_mass, drag_area_m2=drag_area, drag_coefficient=drag_cd)
         satellites = [base_sat]
         if use_walker:
             try:
@@ -8455,13 +8713,73 @@ def page_mission_analysis():
                 satellites=satellites, stations=stations,
                 start_utc=datetime.combine(start_date, start_time).replace(tzinfo=timezone.utc),
                 duration_hours=duration_h, step_seconds=step_s, years_since_bol=years_bol)
+            run_ok = False
             with st.spinner("Running mission analysis..."):
-                st.session_state["msim_result"] = analyze(spec)
-            st.session_state["msim_spec"] = spec
+                try:
+                    # bad specs (missing sgp4 package, malformed TLE, decaying
+                    # orbit, zero ballistics) raise ValueError: report, keep
+                    # the previous result untouched
+                    st.session_state["msim_result"] = analyze(spec)
+                    run_ok = True
+                except ValueError as exc:
+                    st.error(f"Analysis failed: {exc}")
+                if run_ok and propagator == "j2_drag":
+                    try:
+                        st.session_state["msim_lifetime"] = estimate_lifetime(
+                            satellites[0], spec.start_utc)
+                    except ValueError:
+                        st.session_state.pop("msim_lifetime", None)
+                elif run_ok:
+                    st.session_state.pop("msim_lifetime", None)
+            if run_ok:
+                st.session_state["msim_spec"] = spec
+                # Per-mission persistence: plain-value snapshot of every input,
+                # snapshotted/restored on mission switch via _MISSION_DATA_KEYS
+                st.session_state["msim_saved_spec"] = {
+                    "alt_km": float(alt_km), "inc_deg": float(inc_deg),
+                    "raan_deg": float(raan_deg), "ecc": float(ecc),
+                    "aop_deg": float(aop_deg), "propagator": propagator,
+                    "pointing": pointing, "years_bol": float(years_bol),
+                    "start_date": start_date.isoformat(),
+                    "start_time": start_time.isoformat(),
+                    "duration_h": float(duration_h), "step_s": float(step_s),
+                    "faces_rows": faces_edit.to_dict("records"),
+                    "efficiency": float(efficiency), "degradation": float(degradation),
+                    "batt_cap": float(batt_cap), "batt_min": float(batt_min),
+                    "batt_max": float(batt_max), "batt_init": float(batt_init),
+                    "batt_rte": float(batt_rte),
+                    "loads_rows": loads_edit.to_dict("records"),
+                    "lk_freq": float(link_freq_mhz), "lk_txw": float(link_tx_w),
+                    "lk_txg": float(link_tx_gain), "lk_rxg": float(link_rx_gain),
+                    "lk_txl": float(link_tx_loss), "lk_rxl": float(link_rx_loss),
+                    "lk_tsys": float(link_tsys), "lk_rate": float(link_rate),
+                    "lk_ebn0": float(link_ebn0), "lk_pol": float(link_pol),
+                    "lk_point": float(link_point), "lk_atm": float(link_atm),
+                    "stations_rows": stations_edit.to_dict("records"),
+                    "use_walker": bool(use_walker), "walker_t": int(walker_t),
+                    "walker_p": int(walker_p), "walker_f": int(walker_f),
+                    "drag_mass_kg": float(drag_mass), "drag_area_m2": float(drag_area),
+                    "drag_cd": float(drag_cd), "tle_text": str(tle_text or ""),
+                }
+                # the run's loads_rows (including any post-injection edits) are
+                # now the saved truth: drop the budget-injected table or it
+                # would keep overriding the saved rows on every later render
+                st.session_state.pop("msim_loads_df", None)
+                st.session_state.pop("msim_gs_df", None)
 
     # ── Results ──────────────────────────────────────────────────
     result = st.session_state.get("msim_result")
     spec = st.session_state.get("msim_spec")
+    # Hot-reload guard: a spec stored by an older engine build may lack newly
+    # added dataclass fields (e.g. drag_coefficient) and crash any consumer
+    # (GMAT export, sweep, sensitivity). Drop the stale pair and ask to re-run.
+    if spec is not None and spec.satellites and \
+            not hasattr(spec.satellites[0], "drag_coefficient"):
+        for _stale_k in ("msim_spec", "msim_result", "msim_lifetime"):
+            st.session_state.pop(_stale_k, None)
+        result, spec = None, None
+        st.info("The analysis engine was updated since this result was computed — "
+                "press **Run analysis** again.")
     if result is None or not result.satellites:
         st.info("Configure the mission spec above, then press **Run analysis**.")
     else:
@@ -8503,6 +8821,15 @@ def page_mission_analysis():
             mr2[3].metric("Worst link margin (dB)", f"{_wlm:+.1f}")
         else:
             mr2[3].metric("Worst link margin (dB)", "—")
+
+        # Orbital lifetime (only stored when the run used the j2_drag propagator)
+        if "msim_lifetime" in st.session_state:
+            _lt = st.session_state["msim_lifetime"]
+            st.columns(4)[0].metric("Est. lifetime",
+                                    "> 25 y" if _lt is None else f"{_lt:.1f} y")
+            st.caption("Coarse King-Hele drag-decay estimate for the first satellite — "
+                       "compare against the 25-year post-mission disposal debris "
+                       "guideline. Informative only, not part of the verdict.")
 
         # Power & SoC timeline
         figp = go.Figure()
@@ -8586,6 +8913,57 @@ def page_mission_analysis():
                 "FSPL (dB)": round(lr.fspl_db, 1),
             } for lr in sr.link_results])
             st.dataframe(link_df, width="stretch", hide_index=True)
+
+        # ── GMAT export stitch ───────────────────────────────────
+        with st.expander("📤 **Export for verification (GMAT)**"):
+            st.caption("Native analysis is Phase A/B fidelity — export the same orbit "
+                       "to GMAT for certified verification; debris/radiation "
+                       "compliance lives in Integrations.")
+            _orb0 = (spec.satellites[0].orbit
+                     if spec is not None and spec.satellites else None)
+            if _orb0 is None or _orb0.propagator == "sgp4":
+                st.caption("GMAT export needs Keplerian elements — not available for "
+                           "the SGP4/TLE propagator.")
+            else:
+                from bepi.integrations.gmat import (
+                    OrbitParams as _GmatOrbit, SpacecraftParams as _GmatSc,
+                    PropagationConfig as _GmatCfg, GroundStation as _GmatGs,
+                    generate_propagation_script)
+                _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                _t0 = spec.start_utc
+                _epoch = (f"{_t0.day:02d} {_months[_t0.month - 1]} {_t0.year} "
+                          f"{_t0.hour:02d}:{_t0.minute:02d}:{_t0.second:02d}.000")
+                _sat0 = spec.satellites[0]
+                _gmat_sc = _GmatSc(
+                    name="BEPISAT",
+                    dry_mass_kg=_sat0.mass_kg if _sat0.mass_kg > 0 else 260.0,
+                    cd=getattr(_sat0, "drag_coefficient", 2.2),
+                    drag_area_m2=_sat0.drag_area_m2 if _sat0.drag_area_m2 > 0 else 1.5)
+                _gmat_orbit = _GmatOrbit(
+                    epoch=_epoch, sma_km=_orb0.semi_major_axis_km,
+                    ecc=_orb0.eccentricity, inc_deg=_orb0.inclination_deg,
+                    raan_deg=_orb0.raan_deg, aop_deg=_orb0.arg_perigee_deg,
+                    ta_deg=_orb0.true_anomaly_deg)
+                _gmat_cfg = _GmatCfg(
+                    duration_days=spec.duration_hours / 24.0,
+                    step_size_s=spec.step_seconds,
+                    force_model={"two_body": "two_body", "j2": "j2"}.get(
+                        _orb0.propagator, "full"))
+                _gmat_gs = [
+                    _GmatGs(name="GS_" + "".join(c if c.isalnum() else "_"
+                                                 for c in gs.name),
+                            lat_deg=gs.latitude_deg, lon_deg=gs.longitude_deg,
+                            alt_m=gs.altitude_m,
+                            min_elevation_deg=gs.min_elevation_deg)
+                    for gs in spec.stations]
+                st.download_button(
+                    "Download GMAT .script",
+                    data=generate_propagation_script(
+                        sc=_gmat_sc, orbit=_gmat_orbit, config=_gmat_cfg,
+                        ground_stations=_gmat_gs),
+                    file_name="bepi_mission_analysis.script",
+                    mime="text/plain", key="msim_gmat_dl")
 
     # ── Trade study ──────────────────────────────────────────────
     with st.expander("📈 **Trade study** (parameter sweep)"):
