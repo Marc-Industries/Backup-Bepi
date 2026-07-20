@@ -37,7 +37,7 @@ BEPI è una piattaforma completa per la gestione di progetti spaziali, focalizza
 
 ### Streamlit Dashboard
 - ✅ App self-contained con mock data (password-protected)
-- ✅ 11 pagine: Overview, Product Tree, Budgets, Requirements, Risks, Schedule, ECSS, Reports, Integrations, Warehouse, Team
+- ✅ 12 pagine: Overview, Product Tree, Budgets, Requirements, Risks, Schedule, Mission Analysis, ECSS, Reports, Integrations, Warehouse, Team
 - ✅ Multi-mission support con session state
 - ✅ Product tree editor con drag&drop (JS integrato)
 - ✅ Budget rollup con margini ECSS (massa/potenza)
@@ -246,6 +246,18 @@ Creata una **missione demo popolata** (`DEMO — EO SmallSat (BEPI Showcase)`, `
 - **🟠 Gantt & TRL realistici (`02c59eb`)**: `db_loader` hardcodava `trl=6` nel budgets_map → la pagina TRL leggeva 6 per tutti; ora legge il TRL reale dei nodi. `gantt_data` ricalcolava ogni barra da CPM early-start (senza dipendenze salvate, tutto a `project_start`); ora preferisce le `start/end_date` reali del task. Dati demo aggiornati (date dal CPM sulle dipendenze mock, TRL 4-9 per sottosistema).
 - **🟡 Integrations export + privacy (`66fbdff`)**: `export_master_config`/`export_drama_config` chiamate con argomenti sbagliati (come oggetto invece che spacchettato) → `TypeError` su DAS/DRAMA/MASTER. Colonna UUID utenti rimossa dalla tabella Team (privacy). Settings: bottone **✕** per chiudere (`9216527`).
 
+## Mission Analysis nativa (2026-07-20)
+
+Motore di mission analysis Phase A/B **nativo** in BEPI (niente più delega obbligata a GMAT/FF per la fattibilità preliminare). Nato dal confronto con **apside.app** (tool concorrente segnalato da Lopresti nel thread "Apside Software"; strategia decisa: BEPI spina dorsale SE/ECSS + analisi nativa, non either/or).
+
+- **Motore** `src/bepi/integrations/mission_sim.py` (~670 righe, numpy+stdlib, **zero dipendenze nuove**): orbita circolare two_body/J2 secolare, eclissi a umbra cilindrica, attitude nadir/sun-pointing, potenza solare per-faccia con degradazione, batteria SoC (round-trip eff sqrt-split), loads duty-cycled (always/sunlit/eclipse/pass@GS), link budget (Friis, Eb/N0, worst-case a min elevazione, 228.6 dBW/K/Hz), passes AOS/LOS, ground track, Walker delta, verdetto GO/REVIEW/WILL-NOT-FLY, `sweep()` 1-D e `sensitivity()` tornado (±%).
+- **Validazione**: riproduce i riferimenti Apside sul caso AlbaSat alla cifra (5761 samples, 31 eclissi, 8 passes Padova, net +5.66 W, margine +4.50 dB, beta −58.3°; con two_body identico al POC +5.59 W / 25.3% eclissi); sweep quota 400→800 km endpoints 5.92→1.60 dB monotono (Apside 5.78→1.53). Riferimenti a loro volta ancorati alla validazione GMAT documentata di Apside.
+- **Pagina** "Mission Analysis" (nav dopo Schedule, icona graph-up-arrow, `page_mission_analysis`, chiavi `msim_*`): editor spec a expander (orbita/finestra, facce solari, loads, link, GS, Walker), verdetto + check per area, plot potenza+SoC, bar per-faccia, tabella passes, ground track Scattergeo, trade study e sensitivity. Session-only, zero DB, default da `orb_alt`/`orb_inc` di fase.
+- **Test** `tests/unit/test_mission_sim.py`: 15 test (regressione AlbaSat, chiusura two_body, FSPL +6.02 dB/raddoppio, sun-pointing, SoC bounds, scheduling loads, sweep monotono, accoppiamenti sensitivity, Walker, verdetti + 5 regression della review). Suite piena **67 passed**.
+- **Review avversaria multi-agente** (7 agenti, ~20 min): 9 finding, 5 seri **fixati** — 🔴 pagina crashava se la fase attiva aveva quota < 200 km (LLO lunare scrive `orb_alt=100` non clampato → `StreamlitValueBelowMinError` al render); normali NaN dal data_editor → `avg_net=nan` e **falso GO** (ora riga skippata); Walker T<P → spec vuota → IndexError su sweep (ora `walker_delta` valida T%P==0); generazione negativa per `years>1/degradation` (ora clamp a 0); normali non unitarie amplificavano la potenza di ‖n‖ (ora normalizzate + ValueError su zero/NaN). Naive datetime ora interpretato UTC (prima: timezone locale → GMST sfasato di 30°).
+- **Nota fisica** (errore mio di riferimento, beccato dal test-agent): ±5% su tx_power = ±10·log10(1.05) = **0.212 dB/lato** (grandezza di potenza, non ampiezza — 20·log10 era sbagliato); lo span totale 0.435 dB coincide numericamente. Test asserisce i valori fisicamente corretti.
+- ⚠️ `graphify` non installato nel PATH → graph refresh pendente al prossimo ambiente che ce l'ha.
+
 ---
 
 ## Roadmap Futuro
@@ -264,7 +276,7 @@ Creata una **missione demo popolata** (`DEMO — EO SmallSat (BEPI Showcase)`, `
 - **Jacopo Coccimiglio** — ECSS compliance: corpus deliverable/tailoring/lessons ("second brain"), lifecycle Table A-1, matrice pre-tailoring Table 7-2. Vedi `docs/ecss-corpus/`.
 
 Questo file DEVE essere aggiornato ad ogni cambiamento significativo.  
-Ultimo aggiornamento: 19 Luglio 2026
+Ultimo aggiornamento: 20 Luglio 2026
 
 ## graphify
 

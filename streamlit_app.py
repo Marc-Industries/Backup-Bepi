@@ -1029,9 +1029,9 @@ with st.sidebar:
     )
     page = option_menu(
         None,
-        ["Overview", "Product Tree", "Budgets", "Requirements", "Risks", "Schedule", "ECSS", "Reports", "Integrations", "Warehouse", "Team"],
+        ["Overview", "Product Tree", "Budgets", "Requirements", "Risks", "Schedule", "Mission Analysis", "ECSS", "Reports", "Integrations", "Warehouse", "Team"],
         icons=["rocket-takeoff", "diagram-3", "bar-chart-fill", "list-check",
-               "exclamation-triangle-fill", "calendar3", "book", "file-earmark-pdf-fill", "plug-fill", "box-seam", "people-fill"],
+               "exclamation-triangle-fill", "calendar3", "graph-up-arrow", "book", "file-earmark-pdf-fill", "plug-fill", "box-seam", "people-fill"],
         default_index=0,
         styles={
             "container": {"padding": "0", "background-color": "transparent"},
@@ -8254,6 +8254,408 @@ def page_integrations():
                     st.error(f"Import failed: {', '.join(result.warnings)}")
 
 
+def page_mission_analysis():
+    """Phase A/B parametric mission analysis (self-contained, session-only)."""
+    import numpy as np
+    from datetime import datetime, time as dtime, timezone
+    from bepi.integrations.mission_sim import (
+        OrbitSpec, SolarFace, BatterySpec, LoadSpec, LinkSpec,
+        GroundStationSpec, SatelliteSpec, MissionSpec,
+        analyze, walker_delta, sweep, sensitivity, R_EARTH,
+    )
+
+    colored_header(
+        label="Mission Analysis",
+        description="Phase A/B parametric mission analysis: orbit -> eclipse -> per-face power -> "
+                    "battery SoC -> link -> passes. Cross-checked against GMAT-validated references.",
+        color_name="light-blue-70",
+    )
+
+    _SWEEP_PARAMS = ["altitude_km", "inclination_deg", "battery_capacity_wh",
+                     "tx_power_w", "data_rate_bps", "solar_area_scale", "years_since_bol"]
+    _MEASURES = ["avg_net_w", "min_soc", "worst_link_margin_db", "total_passes", "eclipse_fraction"]
+    _SWEEP_RANGES = {
+        "altitude_km": (400.0, 800.0),
+        "inclination_deg": (30.0, 98.0),
+        "battery_capacity_wh": (10.0, 100.0),
+        "tx_power_w": (0.5, 10.0),
+        "data_rate_bps": (9600.0, 2_000_000.0),
+        "solar_area_scale": (0.5, 2.0),
+        "years_since_bol": (0.0, 5.0),
+    }
+
+    # ── Spec ─────────────────────────────────────────────────────
+    with st.expander("🛰️ **Orbit & analysis window**", expanded=True):
+        oc1, oc2, oc3 = st.columns(3)
+        # phase selection writes orb_alt/orb_inc unclamped (e.g. lunar 100 km LLO):
+        # clamp the defaults into the widget bounds or number_input raises on render
+        _alt_default = min(50000.0, max(200.0, float(st.session_state.get("orb_alt", 500))))
+        _inc_default = min(180.0, max(0.0, float(st.session_state.get("orb_inc", 97.4))))
+        alt_km = oc1.number_input("Altitude (km)", 200.0, 50000.0, _alt_default, key="msim_alt")
+        inc_deg = oc2.number_input("Inclination (°)", 0.0, 180.0, _inc_default, key="msim_inc")
+        raan_deg = oc3.number_input("RAAN (°)", 0.0, 360.0, 0.0, key="msim_raan")
+        oc4, oc5, oc6 = st.columns(3)
+        propagator = oc4.selectbox("Propagator", ["j2", "two_body"], key="msim_prop")
+        pointing = oc5.selectbox("Pointing mode", ["nadir", "sun"], key="msim_pointing")
+        years_bol = oc6.number_input("Years since BOL", 0.0, 25.0, 0.0, key="msim_years")
+        od1, od2, od3, od4 = st.columns(4)
+        start_date = od1.date_input("Start date (UTC)", date(2026, 7, 20), key="msim_start_date")
+        start_time = od2.time_input("Start time (UTC)", dtime(8, 27, 38), key="msim_start_time")
+        duration_h = od3.number_input("Duration (h)", 1.0, 720.0, 48.0, key="msim_dur")
+        step_s = od4.number_input("Step (s)", 1.0, 600.0, 30.0, key="msim_step")
+
+    with st.expander("☀️ **Solar & battery**"):
+        st.caption("Face normals in body frame — nadir: +Z zenith, +X along-track; sun-pointing: +X toward the Sun.")
+        faces_edit = st.data_editor(
+            pd.DataFrame([
+                {"Name": "+X", "Area (m²)": 0.02, "nx": 1.0, "ny": 0.0, "nz": 0.0},
+                {"Name": "-X", "Area (m²)": 0.02, "nx": -1.0, "ny": 0.0, "nz": 0.0},
+                {"Name": "+Y", "Area (m²)": 0.02, "nx": 0.0, "ny": 1.0, "nz": 0.0},
+                {"Name": "-Y", "Area (m²)": 0.02, "nx": 0.0, "ny": -1.0, "nz": 0.0},
+                {"Name": "+Z", "Area (m²)": 0.01, "nx": 0.0, "ny": 0.0, "nz": 1.0},
+            ]),
+            num_rows="dynamic", hide_index=True, width="stretch", key="msim_faces")
+        sc1, sc2 = st.columns(2)
+        efficiency = sc1.number_input("Cell efficiency", 0.05, 0.5, 0.3, step=0.01, key="msim_eff")
+        degradation = sc2.number_input("Degradation per year", 0.0, 0.2, 0.025, step=0.005,
+                                       format="%.3f", key="msim_degr")
+        bc1, bc2, bc3, bc4, bc5 = st.columns(5)
+        batt_cap = bc1.number_input("Capacity (Wh)", 1.0, 10000.0, 30.0, key="msim_batt_cap")
+        batt_min = bc2.number_input("Min SoC", 0.0, 0.9, 0.3, step=0.05, key="msim_batt_min")
+        batt_max = bc3.number_input("Max SoC", 0.1, 1.0, 1.0, step=0.05, key="msim_batt_max")
+        batt_init = bc4.number_input("Initial SoC", 0.0, 1.0, 0.8, step=0.05, key="msim_batt_init")
+        batt_rte = bc5.number_input("Round-trip eff.", 0.5, 1.0, 0.9, step=0.01, key="msim_batt_rte")
+
+    with st.expander("🔌 **Loads**"):
+        loads_edit = st.data_editor(
+            pd.DataFrame([
+                {"Name": "OBC + EPS", "Power (W)": 1.2, "When": "always", "Station": ""},
+                {"Name": "ADCS", "Power (W)": 1.0, "When": "sunlit", "Station": ""},
+                {"Name": "Heaters", "Power (W)": 1.5, "When": "eclipse", "Station": ""},
+                {"Name": "S-band TX", "Power (W)": 4.0, "When": "pass", "Station": ""},
+            ]),
+            num_rows="dynamic", hide_index=True, width="stretch",
+            column_config={
+                "When": st.column_config.SelectboxColumn(
+                    options=["always", "sunlit", "eclipse", "pass"], required=True),
+                "Station": st.column_config.TextColumn(
+                    help="Only for 'pass' loads; empty = any station"),
+            },
+            key="msim_loads")
+
+    with st.expander("📡 **Link (downlink budget)**"):
+        lk1, lk2, lk3, lk4 = st.columns(4)
+        link_freq_mhz = lk1.number_input("Frequency (MHz)", 100.0, 40000.0, 2245.0, key="msim_lk_freq")
+        link_tx_w = lk2.number_input("TX power (W)", 0.01, 1000.0, 2.0, key="msim_lk_txw")
+        link_tx_gain = lk3.number_input("TX antenna gain (dBi)", -10.0, 60.0, 6.5, key="msim_lk_txg")
+        link_rx_gain = lk4.number_input("RX antenna gain (dBi)", -10.0, 80.0, 32.0, key="msim_lk_rxg")
+        lk5, lk6, lk7, lk8 = st.columns(4)
+        link_tx_loss = lk5.number_input("TX line loss (dB)", 0.0, 20.0, 1.0, key="msim_lk_txl")
+        link_rx_loss = lk6.number_input("RX line loss (dB)", 0.0, 20.0, 0.5, key="msim_lk_rxl")
+        link_tsys = lk7.number_input("System noise temp (K)", 10.0, 5000.0, 220.0, key="msim_lk_tsys")
+        link_rate = lk8.number_input("Data rate (bps)", 100.0, 1e9, 256000.0, key="msim_lk_rate")
+        lk9, lk10, lk11, lk12 = st.columns(4)
+        link_ebn0 = lk9.number_input("Required Eb/N0 (dB)", 0.0, 30.0, 9.6, key="msim_lk_ebn0")
+        link_pol = lk10.number_input("Polarization loss (dB)", 0.0, 10.0, 0.5, key="msim_lk_pol")
+        link_point = lk11.number_input("Pointing loss (dB)", 0.0, 10.0, 0.5, key="msim_lk_point")
+        link_atm = lk12.number_input("Atmospheric loss (dB)", 0.0, 20.0, 0.5, key="msim_lk_atm")
+
+    with st.expander("🌍 **Ground stations**"):
+        stations_edit = st.data_editor(
+            pd.DataFrame([
+                {"Name": "Padova GS", "Lat (°)": 45.406, "Lon (°)": 11.876,
+                 "Alt (m)": 12.0, "Min elev (°)": 10.0},
+            ]),
+            num_rows="dynamic", hide_index=True, width="stretch", key="msim_stations")
+
+    with st.expander("🛰️🛰️ **Constellation**"):
+        use_walker = st.checkbox("Walker delta constellation", value=False, key="msim_walker")
+        wc1, wc2, wc3 = st.columns(3)
+        walker_t = wc1.number_input("Total satellites (T)", 1, 120, 6, key="msim_walker_t",
+                                    disabled=not use_walker)
+        walker_p = wc2.number_input("Planes (P)", 1, 24, 3, key="msim_walker_p",
+                                    disabled=not use_walker)
+        walker_f = wc3.number_input("Phasing (F)", 0, 24, 1, key="msim_walker_f",
+                                    disabled=not use_walker)
+
+    # ── Build spec & run ─────────────────────────────────────────
+    if st.button("▶ Run analysis", type="primary", key="msim_run"):
+        faces = []
+        for _, row in faces_edit.iterrows():
+            try:
+                if pd.isna(row["Name"]) or pd.isna(row["Area (m²)"]) or float(row["Area (m²)"]) <= 0:
+                    continue
+                # blank cells in a fresh data_editor row come through as NaN, and
+                # float(nan) does not raise: a NaN normal would poison the whole
+                # analysis (NaN metrics under a false GO verdict) — skip the row
+                if pd.isna(row["nx"]) or pd.isna(row["ny"]) or pd.isna(row["nz"]):
+                    continue
+                normal = (float(row["nx"]), float(row["ny"]), float(row["nz"]))
+                if not all(np.isfinite(c) for c in normal) or normal == (0.0, 0.0, 0.0):
+                    continue
+                faces.append(SolarFace(
+                    name=str(row["Name"]), area_m2=float(row["Area (m²)"]),
+                    normal_body=normal))
+            except (TypeError, ValueError):
+                continue
+        loads = []
+        for _, row in loads_edit.iterrows():
+            try:
+                if pd.isna(row["Name"]) or pd.isna(row["Power (W)"]):
+                    continue
+                loads.append(LoadSpec(
+                    name=str(row["Name"]), power_w=float(row["Power (W)"]),
+                    when=str(row["When"]) if pd.notna(row["When"]) else "always",
+                    station_name=str(row["Station"]) if pd.notna(row["Station"]) else ""))
+            except (TypeError, ValueError):
+                continue
+        stations = []
+        for _, row in stations_edit.iterrows():
+            try:
+                if pd.isna(row["Name"]) or pd.isna(row["Lat (°)"]) or pd.isna(row["Lon (°)"]):
+                    continue
+                stations.append(GroundStationSpec(
+                    name=str(row["Name"]),
+                    latitude_deg=float(row["Lat (°)"]), longitude_deg=float(row["Lon (°)"]),
+                    altitude_m=float(row["Alt (m)"]) if pd.notna(row["Alt (m)"]) else 0.0,
+                    min_elevation_deg=float(row["Min elev (°)"]) if pd.notna(row["Min elev (°)"]) else 10.0))
+            except (TypeError, ValueError):
+                continue
+
+        link = LinkSpec(
+            name="S-band downlink", frequency_hz=link_freq_mhz * 1e6,
+            tx_power_w=link_tx_w, tx_antenna_gain_dbi=link_tx_gain,
+            rx_antenna_gain_dbi=link_rx_gain, tx_line_loss_db=link_tx_loss,
+            rx_line_loss_db=link_rx_loss, system_noise_temperature_k=link_tsys,
+            data_rate_bps=link_rate, required_eb_n0_db=link_ebn0,
+            polarization_loss_db=link_pol, pointing_loss_db=link_point,
+            atmospheric_loss_db=link_atm)
+        base_sat = SatelliteSpec(
+            name="SAT",
+            orbit=OrbitSpec(semi_major_axis_km=R_EARTH + alt_km, inclination_deg=inc_deg,
+                            raan_deg=raan_deg, propagator=propagator),
+            pointing_mode=pointing, faces=faces, efficiency=efficiency,
+            degradation_per_year=degradation,
+            battery=BatterySpec(capacity_wh=batt_cap, min_soc=batt_min, max_soc=batt_max,
+                                initial_soc=batt_init, round_trip_efficiency=batt_rte),
+            loads=loads, links=[link])
+        satellites = [base_sat]
+        if use_walker:
+            try:
+                satellites = walker_delta(int(walker_t), int(walker_p), int(walker_f), base_sat)
+            except ValueError as exc:
+                satellites = []
+                st.error(f"Invalid Walker configuration: {exc}")
+        if satellites:
+            spec = MissionSpec(
+                name="Mission Analysis",
+                satellites=satellites, stations=stations,
+                start_utc=datetime.combine(start_date, start_time).replace(tzinfo=timezone.utc),
+                duration_hours=duration_h, step_seconds=step_s, years_since_bol=years_bol)
+            with st.spinner("Running mission analysis..."):
+                st.session_state["msim_result"] = analyze(spec)
+            st.session_state["msim_spec"] = spec
+
+    # ── Results ──────────────────────────────────────────────────
+    result = st.session_state.get("msim_result")
+    spec = st.session_state.get("msim_spec")
+    if result is None or not result.satellites:
+        st.info("Configure the mission spec above, then press **Run analysis**.")
+    else:
+        if result.verdict == "WILL-NOT-FLY":
+            st.error(f"### Verdict: {result.verdict}")
+        elif result.verdict == "REVIEW":
+            st.warning(f"### Verdict: {result.verdict}")
+        else:
+            st.success(f"### Verdict: {result.verdict}")
+        _check_icons = {"PASS": "✅", "WATCH": "⚠️", "FAIL": "❌"}
+        for chk in result.checks:
+            st.markdown(f"{_check_icons.get(chk.status, '•')} **{chk.area.capitalize()}** — {chk.message}")
+
+        sat_names = [s.name for s in result.satellites]
+        if len(sat_names) > 1:
+            cs1, cs2, cs3 = st.columns(3)
+            cs1.metric("Satellites", len(sat_names))
+            cs2.metric("Total passes (constellation)", result.total_passes)
+            cs3.metric("Stations", len(result.passes_by_station))
+            if result.passes_by_station:
+                st.caption("Passes by station: " + ", ".join(
+                    f"{name}: {n}" for name, n in result.passes_by_station.items()))
+            view_name = st.selectbox("Satellite to inspect", sat_names, key="msim_sat_view")
+        else:
+            view_name = sat_names[0]
+        sr = next(s for s in result.satellites if s.name == view_name)
+
+        mr1 = st.columns(4)
+        mr1[0].metric("Samples", f"{result.n_samples:,}")
+        mr1[1].metric("Eclipses", sr.eclipse_count)
+        mr1[2].metric("Worst eclipse (min)", f"{sr.worst_eclipse_min:.1f}")
+        mr1[3].metric("Passes", len(sr.passes))
+        mr2 = st.columns(4)
+        mr2[0].metric("Beta angle (°)", f"{sr.beta_deg:.1f}")
+        mr2[1].metric("Avg net power (W)", f"{sr.avg_net_w:+.2f}")
+        mr2[2].metric("Min SoC", f"{sr.min_soc_reached:.0%}")
+        if sr.link_results:
+            _wlm = min(lr.worst_margin_db for lr in sr.link_results)
+            mr2[3].metric("Worst link margin (dB)", f"{_wlm:+.1f}")
+        else:
+            mr2[3].metric("Worst link margin (dB)", "—")
+
+        # Power & SoC timeline
+        figp = go.Figure()
+        figp.add_trace(go.Scatter(x=sr.times, y=sr.gen_w, name="Generation (W)",
+                                  line=dict(color="#f1c40f", width=1)))
+        figp.add_trace(go.Scatter(x=sr.times, y=sr.load_w, name="Load (W)",
+                                  line=dict(color="#e74c3c", width=1)))
+        figp.add_trace(go.Scatter(x=sr.times, y=sr.net_w, name="Net (W)",
+                                  line=dict(color="#3498db", width=1)))
+        figp.add_trace(go.Scatter(x=sr.times, y=sr.soc * 100.0, name="SoC (%)", yaxis="y2",
+                                  line=dict(color="#2ecc71", width=1.5)))
+        figp.update_layout(
+            title=f"Power & battery — {sr.name}", height=380,
+            yaxis=dict(title="Power (W)"),
+            yaxis2=dict(title="SoC (%)", overlaying="y", side="right", range=[0, 105]),
+            legend=dict(orientation="h", y=1.12), margin=dict(l=10, r=10, t=60, b=10))
+        st.plotly_chart(figp, width="stretch")
+
+        # Per-face average generation
+        if sr.face_avg_w:
+            figf = go.Figure(go.Bar(x=list(sr.face_avg_w.keys()),
+                                    y=list(sr.face_avg_w.values()),
+                                    marker_color="#f39c12"))
+            figf.update_layout(title="Average generation per face (W)", height=300,
+                               margin=dict(l=10, r=10, t=50, b=10))
+            st.plotly_chart(figf, width="stretch")
+
+        # Passes table
+        st.markdown("**Ground-station passes**")
+        if sr.passes:
+            passes_df = pd.DataFrame([{
+                "Station": p.station,
+                "AOS (UTC)": p.aos.strftime("%Y-%m-%d %H:%M:%S"),
+                "LOS (UTC)": p.los.strftime("%Y-%m-%d %H:%M:%S"),
+                "Max elev (°)": round(p.max_elevation_deg, 1),
+                "Duration (min)": round(p.duration_min, 1),
+            } for p in sr.passes])
+            st.dataframe(passes_df, width="stretch", hide_index=True)
+        else:
+            st.info("No passes for this satellite in the analysis window.")
+
+        # Ground track
+        if sr.ground_track:
+            gt_lat = [p[0] for p in sr.ground_track]
+            gt_lon = [p[1] for p in sr.ground_track]
+            figg = go.Figure()
+            figg.add_trace(go.Scattergeo(lat=gt_lat, lon=gt_lon, mode="markers",
+                                         marker=dict(size=2, color="#3498db"),
+                                         name=sr.name))
+            if spec is not None and spec.stations:
+                figg.add_trace(go.Scattergeo(
+                    lat=[gs.latitude_deg for gs in spec.stations],
+                    lon=[gs.longitude_deg for gs in spec.stations],
+                    text=[gs.name for gs in spec.stations],
+                    mode="markers+text", textposition="top center",
+                    marker=dict(size=9, color="#e74c3c", symbol="triangle-up"),
+                    name="Ground stations"))
+            figg.update_layout(
+                title="Ground track", height=420,
+                geo=dict(projection_type="equirectangular", showland=True,
+                         landcolor="#2c3e50", showocean=True, oceancolor="#1a252f",
+                         showcountries=True, countrycolor="#34495e"),
+                margin=dict(l=0, r=0, t=50, b=0))
+            st.plotly_chart(figg, width="stretch")
+
+        # Link results table
+        if sr.link_results:
+            st.markdown("**Link budget (worst case at minimum elevation)**")
+            link_df = pd.DataFrame([{
+                "Link": lr.name,
+                "Worst margin (dB)": round(lr.worst_margin_db, 2),
+                "Slant range (km)": round(lr.slant_range_km, 1),
+                "FSPL (dB)": round(lr.fspl_db, 1),
+            } for lr in sr.link_results])
+            st.dataframe(link_df, width="stretch", hide_index=True)
+
+    # ── Trade study ──────────────────────────────────────────────
+    with st.expander("📈 **Trade study** (parameter sweep)"):
+        if spec is None:
+            st.info("Run an analysis first — the sweep re-uses the last spec.")
+        else:
+            sw1, sw2 = st.columns(2)
+            sweep_param = sw1.selectbox("Parameter", _SWEEP_PARAMS, key="msim_sweep_param")
+            sweep_measure = sw2.selectbox("Measure", _MEASURES, key="msim_sweep_measure")
+            rng = _SWEEP_RANGES[sweep_param]
+            sw3, sw4, sw5 = st.columns(3)
+            sweep_min = sw3.number_input("Min", value=rng[0], key=f"msim_sweep_min_{sweep_param}")
+            sweep_max = sw4.number_input("Max", value=rng[1], key=f"msim_sweep_max_{sweep_param}")
+            sweep_steps = sw5.number_input("Steps", 3, 50, 11, key="msim_sweep_steps")
+            if st.button("Run sweep", key="msim_sweep_run"):
+                values = list(np.linspace(sweep_min, sweep_max, int(sweep_steps)))
+                with st.spinner(f"Sweeping {sweep_param} over {int(sweep_steps)} points..."):
+                    points = sweep(spec, sweep_param, values, sweep_measure)
+                xs = [p[0] for p in points]
+                ys = [p[1] for p in points]
+                finite = [(x, y) for x, y in points if y == y]  # drop NaN
+                figs = go.Figure()
+                figs.add_trace(go.Scatter(x=xs, y=ys, mode="lines+markers",
+                                          name=sweep_measure, line=dict(color="#3498db")))
+                if finite:
+                    if sweep_measure == "eclipse_fraction":
+                        best = min(finite, key=lambda p: p[1])
+                    else:
+                        best = max(finite, key=lambda p: p[1])
+                    figs.add_trace(go.Scatter(
+                        x=[best[0]], y=[best[1]], mode="markers+text",
+                        marker=dict(size=12, color="#2ecc71", symbol="star"),
+                        text=[f"best: {best[1]:.3g} @ {best[0]:.3g}"],
+                        textposition="top center", name="optimum"))
+                figs.update_layout(title=f"{sweep_measure} vs {sweep_param}", height=380,
+                                   xaxis_title=sweep_param, yaxis_title=sweep_measure,
+                                   margin=dict(l=10, r=10, t=50, b=10))
+                st.plotly_chart(figs, width="stretch")
+
+    # ── Sensitivity ──────────────────────────────────────────────
+    with st.expander("🌪️ **Sensitivity** (one-at-a-time tornado)"):
+        if spec is None:
+            st.info("Run an analysis first — the sensitivity re-uses the last spec.")
+        else:
+            sn1, sn2 = st.columns(2)
+            sens_measure = sn1.selectbox("Measure", _MEASURES, key="msim_sens_measure")
+            sens_pert = sn2.number_input("Perturbation (%)", 1.0, 50.0, 5.0, key="msim_sens_pert")
+            if st.button("Run sensitivity", key="msim_sens_run"):
+                sens_params = [p for p in _SWEEP_PARAMS
+                               if p != "years_since_bol" or spec.years_since_bol > 0]
+                with st.spinner("Running sensitivity analysis..."):
+                    sens = sensitivity(spec, sens_measure, sens_params,
+                                       perturbation=sens_pert / 100.0)
+                rows = []
+                base_value = None
+                for param, entry in sens.items():
+                    base_value = entry["base"]
+                    lo, hi = entry["minus"], entry["plus"]
+                    if lo != lo or hi != hi:
+                        continue
+                    rows.append((param, min(lo, hi), max(lo, hi), abs(hi - lo)))
+                rows.sort(key=lambda r: r[3])
+                if not rows or base_value is None or base_value != base_value:
+                    st.warning("No finite sensitivity results for this measure.")
+                else:
+                    figt = go.Figure(go.Bar(
+                        y=[r[0] for r in rows],
+                        x=[r[2] - r[1] for r in rows],
+                        base=[r[1] for r in rows],
+                        orientation="h", marker_color="#9b59b6",
+                        hovertemplate="%{y}: %{base:.4g} → %{x:.4g}<extra></extra>"))
+                    figt.add_vline(x=base_value, line_dash="dash", line_color="#e0e0e0",
+                                   annotation_text=f"baseline {base_value:.3g}",
+                                   annotation_position="top")
+                    figt.update_layout(
+                        title=f"Tornado — {sens_measure} at ±{sens_pert:.0f}%",
+                        height=90 + 45 * len(rows), xaxis_title=sens_measure,
+                        margin=dict(l=10, r=10, t=50, b=10))
+                    st.plotly_chart(figt, width="stretch")
+
+
 # ===========================================================================
 # Router
 # ===========================================================================
@@ -8264,6 +8666,7 @@ PAGE_MAP = {
     "Requirements": page_requirements,
     "Risks": page_risks,
     "Schedule": page_schedule,
+    "Mission Analysis": page_mission_analysis,
     "ECSS": page_ecss,
     "Reports": page_reports,
     "Integrations": page_integrations,
