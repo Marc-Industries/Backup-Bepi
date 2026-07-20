@@ -8561,10 +8561,18 @@ def page_mission_analysis():
                     marker=dict(size=9, color="#e74c3c", symbol="triangle-up"),
                     name="Ground stations"))
             figg.update_layout(
-                title="Ground track", height=420,
+                title="Ground track", height=460,
                 geo=dict(projection_type="equirectangular", showland=True,
                          landcolor="#2c3e50", showocean=True, oceancolor="#1a252f",
-                         showcountries=True, countrycolor="#34495e"),
+                         showcountries=True, countrycolor="#34495e",
+                         showframe=False, coastlinecolor="#46627f",
+                         bgcolor="rgba(0,0,0,0)",
+                         # explicit full-world ranges + transparent paper: without
+                         # them the geo shrinks to a small letterboxed map inside
+                         # a white plotly paper rectangle
+                         lonaxis=dict(range=[-180, 180]),
+                         lataxis=dict(range=[-90, 90])),
+                paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(l=0, r=0, t=50, b=0))
             st.plotly_chart(figg, width="stretch")
 
