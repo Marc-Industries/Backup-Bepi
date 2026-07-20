@@ -80,5 +80,9 @@
   "78": "seed_demo_mission",
   "79": "LL-001 — Hubble, aberrazione sferica",
   "80": "LL-002 — Mars Climate Orbiter, mismatch di unità",
-  "81": "ECSS corpus — knowledge layer (docs-as-code)"
+  "81": "ECSS corpus — knowledge layer (docs-as-code)",
+  "82": "page_reports",
+  "83": "page_team",
+  "84": "seed_demo_mission.py",
+  "85": "test_risk_loading.py"
 }

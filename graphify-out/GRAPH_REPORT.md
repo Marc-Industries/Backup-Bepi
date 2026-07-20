@@ -1,16 +1,16 @@
 # Graph Report - BEPI  (2026-07-20)
 
 ## Corpus Check
-- 143 files · ~136,008 words
+- 143 files · ~136,735 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1337 nodes · 2771 edges · 86 communities (84 shown, 2 thin omitted)
+- 1337 nodes · 2773 edges · 84 communities (82 shown, 2 thin omitted)
 - Extraction: 74% EXTRACTED · 26% INFERRED · 0% AMBIGUOUS · INFERRED: 713 edges (avg confidence: 0.68)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `daed06df`
+- Built from commit: `92049b28`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -59,7 +59,6 @@
 - Cluster 41
 - Cluster 42
 - Cluster 43
-- Cluster 44
 - Cluster 45
 - Cluster 46
 - Cluster 47
@@ -75,7 +74,6 @@
 - LL-001 — Hubble, aberrazione sferica
 - LL-002 — Mars Climate Orbiter, mismatch di unità
 - ECSS corpus — knowledge layer (docs-as-code)
-- page_reports
 - page_team
 - seed_demo_mission.py
 - test_risk_loading.py
@@ -116,7 +114,7 @@
 - **Supabase schema: core tables (CLAUDE.md list)** — table-missions, table-requirements, table-risks, table-tasks, table-product-tree-nodes, table-equip-budgets, table-approval-log, table-email-queue, table-team-members, table-warehouse-items, table-procurement-orders [EXTRACTED]
 - **DevOps configuration files** — requirements-txt, requirements-dev-txt, github_workflows_ci_workflow, docker-compose [EXTRACTED]
 
-## Communities (86 total, 2 thin omitted)
+## Communities (84 total, 2 thin omitted)
 
 ### Community 0 - "Celestial Bodies Data"
 Cohesion: 0.12
@@ -160,15 +158,15 @@ Nodes (20): _force_model(), generate_maneuver_script(), generate_propagation_scr
 
 ### Community 10 - "Demo Mission Seeder"
 Cohesion: 0.12
-Nodes (20): date, _as_date(), compute_cpm(), CPMResult, gantt_data(), infer_predecessors_from_dates(), project_start_from_tasks(), Scheduling: WBS, Gantt, CPM/PERT. (+12 more)
+Nodes (21): date, _as_date(), compute_cpm(), CPMResult, gantt_data(), infer_predecessors_from_dates(), project_start_from_tasks(), Scheduling: WBS, Gantt, CPM/PERT. (+13 more)
 
 ### Community 11 - "NASA NAC/RAC Radiation"
 Cohesion: 0.12
 Nodes (30): int, compute_ms(), compute_nacrac(), compute_rc(), compute_ri(), MSParams, MSResult, NACRACParams (+22 more)
 
 ### Community 12 - "DB Writer (mutations)"
-Cohesion: 0.12
-Nodes (29): add_fmeca_entry(), add_mission(), add_mission_member(), add_product_node(), add_requirement(), add_risk(), add_task(), _clean_updates() (+21 more)
+Cohesion: 0.13
+Nodes (26): add_fmeca_entry(), add_product_node(), add_requirement(), add_risk(), add_task(), _clean_updates(), delete_fmeca_entry(), delete_mission() (+18 more)
 
 ### Community 13 - "DAS/DRAMA/MASTER Importer"
 Cohesion: 0.14
@@ -179,8 +177,8 @@ Cohesion: 0.14
 Nodes (21): _code_by_id(), _compute_criticality(), FMECAEntryData, mock_fmeca(), mock_product_tree_flat(), mock_requirements(), mock_risks(), mock_tasks() (+13 more)
 
 ### Community 15 - "Onboarding & Mission Helpers"
-Cohesion: 0.11
-Nodes (28): get_framework(), _base_context(), _build_budget_tree(), _default_operating_mode(), _get_equip_budgets(), _get_operating_modes(), _get_product_tree(), page_budgets() (+20 more)
+Cohesion: 0.12
+Nodes (28): get_framework(), _base_context(), _build_budget_tree(), _default_operating_mode(), _ecss_lessons_tab(), _get_equip_budgets(), _get_operating_modes(), _get_product_tree() (+20 more)
 
 ### Community 16 - "Requirements Services"
 Cohesion: 0.13
@@ -191,20 +189,20 @@ Cohesion: 0.11
 Nodes (18): mission_create(), _render_tree(), tree_show(), build_tree(), compute_wbs_codes(), find_node(), flatten_tree(), generate_node_code() (+10 more)
 
 ### Community 18 - "Onboarding Flow (loaders)"
-Cohesion: 0.18
-Nodes (20): load_missions_for_user(), _check_invitation(), check_onboarding_needed(), _create_invitation(), _finalize_onboarding(), _generate_invite_code(), _load_user_missions(), Create mission and finalize onboarding. (+12 more)
+Cohesion: 0.14
+Nodes (25): load_missions_for_user(), add_mission(), add_mission_member(), _orbit_type_from_altitude(), _check_invitation(), check_onboarding_needed(), _create_invitation(), _finalize_onboarding() (+17 more)
 
 ### Community 19 - "Thermal Model (ESATAN)"
-Cohesion: 0.12
-Nodes (18): _default_mission_data(), _default_mission_data(), get_effective_risks(), _get_mock_team(), _map_mission(), member_badge(), _mission_from_db_row(), mock_product_tree_flat() (+10 more)
+Cohesion: 0.11
+Nodes (20): _default_mission_data(), _default_mission_data(), _ecss_can_edit(), _ecss_deliverables_tab(), get_effective_risks(), _get_mock_team(), _map_mission(), _mission_from_db_row() (+12 more)
 
 ### Community 20 - "Launch Vehicle Capability"
 Cohesion: 0.14
 Nodes (20): _build_vehicles(), c3_capability(), escape_velocity(), launch_window_geometry(), LaunchVehicle, _make_c3_curve(), OrbitType, plot_c3_curves() (+12 more)
 
 ### Community 21 - "Station Keeping & Propellant"
-Cohesion: 0.12
-Nodes (20): compute_propellant_mass(), _density_at_altitude(), _orbital_period(), _orbital_velocity(), Station-keeping and delta-V budget tool for orbital missions., Atmospheric drag compensation ΔV for LEO.      Uses exponential atmosphere model, GEO station-keeping ΔV (N-S + E-W).      N-S: ~50 m/s/yr (luni-solar inclination, Sun-synchronous orbit RAAN maintenance ΔV.      J2 secular drift naturally maint (+12 more)
+Cohesion: 0.09
+Nodes (27): compute_propellant_mass(), _density_at_altitude(), _orbital_period(), _orbital_velocity(), Station-keeping and delta-V budget tool for orbital missions., Atmospheric drag compensation ΔV for LEO.      Uses exponential atmosphere model, GEO station-keeping ΔV (N-S + E-W).      N-S: ~50 m/s/yr (luni-solar inclination, Sun-synchronous orbit RAAN maintenance ΔV.      J2 secular drift naturally maint (+19 more)
 
 ### Community 22 - "SPICE Kernels (NAIF)"
 Cohesion: 0.20
@@ -231,8 +229,8 @@ Cohesion: 0.16
 Nodes (14): C1/C3: Rimozione codice morto, Bug aperti (deliberato), I2: CI workflow, S6: check_password() gate, Bug: Logout/perdita dati dopo ~1h, Comandi locali, docker-compose (PostgreSQL locale), GitHub Actions CI (+6 more)
 
 ### Community 28 - "Environment Constants"
-Cohesion: 0.24
-Nodes (13): Environment, _build_docx_programmatically(), compile_pdf(), _escape_dict(), _escape_latex(), generate_docx_report(), generate_report(), _latex_env() (+5 more)
+Cohesion: 0.16
+Nodes (26): Environment, _auto_width(), export_mission(), export_product_tree(), export_requirements(), export_risks(), export_schedule(), import_product_tree_from_excel() (+18 more)
 
 ### Community 29 - "Excel I/O Services"
 Cohesion: 0.10
@@ -294,10 +292,6 @@ Nodes (15): 1. L'idea e l'obiettivo, 2. Le idee emerse e la scrematura, 3. La li
 Cohesion: 0.20
 Nodes (15): _client(), ensure_review(), excluded_requirements(), initialise_gate(), load_review_gates(), load_tailoring(), Per-mission ECSS project data: review gates, deliverable status, tailoring.  Thi, Return the stored tailoring object: {product_type, decisions:[{req,decision,rati (+7 more)
 
-### Community 44 - "Cluster 44"
-Cohesion: 0.36
-Nodes (7): compare_internal_vs_imported(), DebrisBenchmark, _pct_deviation(), RadiationBenchmark, Benchmark validation for radiation and debris computations., validate_debris(), validate_radiation()
-
 ### Community 45 - "Cluster 45"
 Cohesion: 0.25
 Nodes (4): BREVO_API_KEY, corsHeaders, SERVICE_ROLE_KEY, SUPABASE_URL
@@ -335,8 +329,8 @@ Cohesion: 0.22
 Nodes (8): Il dato che conta: quanti punti decisionali hai, Launch segment element/sub-system — 44 decisioni, Launch segment equipment — 19 decisioni, Matrice completa (Table 7-2), Matrice di pre-tailoring — ECSS-E-ST-10C Rev.1, Punti di decisione per tipo di prodotto, Space segment element/sub-system — 15 decisioni, Space segment equipment — 66 decisioni
 
 ### Community 78 - "seed_demo_mission"
-Cohesion: 0.24
-Nodes (15): can(), can_edit_node(), can_modify_product_tree(), _current_role(), _current_user(), _node_subsystem(), require(), _ecss_can_edit() (+7 more)
+Cohesion: 0.40
+Nodes (10): can(), can_edit_node(), can_modify_product_tree(), _current_role(), _current_user(), _node_subsystem(), require(), _ecss_tailoring_tab() (+2 more)
 
 ### Community 79 - "LL-001 — Hubble, aberrazione sferica"
 Cohesion: 0.33
@@ -350,13 +344,9 @@ Nodes (5): Aggancio al deliverable, Catena causale, Fonte, LL-002 — Mars Clima
 Cohesion: 0.33
 Nodes (5): Aggiornare a una nuova revisione, Come arriva in BEPI (build → app), Cosa c'è qui, ECSS corpus — knowledge layer (docs-as-code), Versioning (ECSS invecchia)
 
-### Community 82 - "page_reports"
-Cohesion: 0.38
-Nodes (13): _auto_width(), export_mission(), export_product_tree(), export_requirements(), export_risks(), export_schedule(), import_product_tree_from_excel(), import_requirements_from_excel() (+5 more)
-
 ### Community 83 - "page_team"
-Cohesion: 0.29
-Nodes (13): colored_header(), get_approval_log(), get_latest_approval(), get_member(), get_req_ownership(), get_requirements(), get_task_assignments(), get_tasks() (+5 more)
+Cohesion: 0.28
+Nodes (13): colored_header(), get_approval_log(), get_latest_approval(), get_member(), get_req_ownership(), get_requirements(), get_task_assignments(), get_team() (+5 more)
 
 ### Community 84 - "seed_demo_mission.py"
 Cohesion: 0.33
@@ -374,7 +364,7 @@ Nodes (6): _load(), Regression: entities loaded from the DB must be the services
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `page_integrations()` connect `Misc Utilities (cone, etc.)` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Product Tree API`, `Cluster 38`, `Radiation Export Models`, `Budgets API`, `NASA NAC/RAC Radiation`, `Cluster 44`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Thermal Model (ESATAN)`, `Launch Vehicle Capability`, `Cluster 52`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `Station Keeping & Propellant`, `page_team`?**
+- **Why does `page_integrations()` connect `Misc Utilities (cone, etc.)` to `Celestial Bodies Data`, `Cluster 32`, `Debris & Atmospheric Risk`, `Product Tree API`, `Cluster 38`, `Radiation Export Models`, `Budgets API`, `NASA NAC/RAC Radiation`, `DAS/DRAMA/MASTER Importer`, `Cluster 46`, `Thermal Model (ESATAN)`, `Launch Vehicle Capability`, `Cluster 52`, `SPICE Kernels (NAIF)`, `Satellite 3D Model`, `Station Keeping & Propellant`, `page_team`?**
   _High betweenness centrality (0.424) - this node is a cross-community bridge._
 - **Why does `bepi.ecss` connect `Cluster 48` to `Thermal Model (ESATAN)`, `Cluster 43`, `Cluster 36`?**
   _High betweenness centrality (0.213) - this node is a cross-community bridge._
