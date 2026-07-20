@@ -991,7 +991,10 @@ if HAS_SUPABASE and (st.session_state.get("ob_step") or (not _onboarding_done an
 
 # Pre-init missions with minimal data only when offline / DB is not enforced
 if not DB_ENFORCED:
-    if "missions" not in st.session_state:
+    # NB: the early "ensure mission state exists" block creates missions as an
+    # EMPTY dict, so the guard must treat {} as "not initialized" or mock mode
+    # never seeds a mission and every page dies on the select-a-mission banner.
+    if not st.session_state.get("missions"):
         st.session_state.missions = {"my-mission": {"name": "My Mission", "description": "New project"}}
         st.session_state.active_mission_id = "my-mission"
         st.session_state._missions_need_init = True
@@ -1597,7 +1600,7 @@ SUBSYSTEM_LEAD_MAP = {m["subsystem"]: m for m in TEAM_MEMBERS if m.get("subsyste
 
 # Complete missions init with full data only when offline / DB is not enforced
 if not DB_ENFORCED:
-    if "missions" not in st.session_state:
+    if not st.session_state.get("missions"):
         st.session_state.missions = {"my-mission": _default_mission_data("My Mission", with_demo=False)}
     if not st.session_state.get("active_mission_id"):
         st.session_state.active_mission_id = "my-mission"
