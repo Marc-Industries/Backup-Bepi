@@ -3342,7 +3342,11 @@ def page_budgets():
                     "No operating modes found for this mission. Add at least "
                     "one mode in Settings → Operating Modes to set per-mode power."
                 )
-            # Compact summary table: Code × Mode (W). Always visible.
+            # Compact summary table: Code × Mode (W). Editable inline when
+            # the user has edit_budget; otherwise read-only. The Save &
+            # Recalculate button below persists both this table and the
+            # equipment-level one (Mass/Qty/Maturity/Name) in one go.
+            summary_edited: pd.DataFrame | None = None
             if equipment_modes and equip_nodes:
                 mode_header = [m["name"] for m in equipment_modes]
                 summary_rows = []
@@ -3358,75 +3362,34 @@ def page_budgets():
                     summary_rows.append(row)
                 summary_df = pd.DataFrame(summary_rows)
                 st.markdown("**Per-equipment × per-mode power (W):**")
-                st.dataframe(
-                    summary_df, hide_index=True, width="stretch",
-                    column_config={
-                        "Code": st.column_config.TextColumn(),
-                        "Name": st.column_config.TextColumn(),
-                        "Total": st.column_config.NumberColumn(format="%.1f W"),
-                        **{m: st.column_config.NumberColumn(format="%.1f W")
-                           for m in mode_header},
-                    },
-                )
-
-            # ---- Equipment picker + per-mode power editor ---------------
-            # Always-visible radio picker. Clicking a name selects the
-            # equipment; the per-mode expander below shows its power.
-            power_inputs: dict[tuple[str, str], float] = {}
-            equip_pick_labels = [
-                f"{n['code']} — {n['name']}" for n in equip_nodes
-            ]
-            cur_pick = st.session_state.get("_bud_picked_code")
-            if cur_pick not in equip_pick_labels:
-                cur_pick = equip_pick_labels[0] if equip_pick_labels else None
-                st.session_state["_bud_picked_code"] = cur_pick
-            picked_label = st.radio(
-                "Equipment to edit",
-                equip_pick_labels,
-                index=equip_pick_labels.index(cur_pick) if cur_pick in equip_pick_labels else 0,
-                key="_bud_power_pick",
-                horizontal=True,
-                help="Select the equipment whose per-mode power you want to inspect or change.",
-            )
-            if picked_label:
-                picked_node = next(
-                    (n for n in equip_nodes if f"{n['code']} — {n['name']}" == picked_label),
-                    equip_nodes[0],
-                )
-                picked_code = picked_node["code"]
-                st.session_state["_bud_picked_code"] = picked_label
-                b = eb.get(picked_code, {})
-                pwr_by_mode = b.get("power_by_mode", {}) or {}
-                st.markdown(
-                    f"**{picked_code} — {picked_node.get('name','')}** &nbsp;·&nbsp; "
-                    f"_Mass {float(b.get('mass', 0.0)):.2f} kg · "
-                    f"Qty {int(b.get('qty', 1))} · "
-                    f"Maturity {b.get('mat','estimate')}_"
-                )
-                if not equipment_modes:
-                    st.warning(
-                        "No operating modes for this mission — add one in "
-                        "Settings → Operating Modes to set per-mode power."
+                if can("edit_budget"):
+                    summary_edited = st.data_editor(
+                        summary_df, key="_bud_power_matrix", hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "Code": st.column_config.TextColumn(disabled=True),
+                            "Name": st.column_config.TextColumn(disabled=True),
+                            "Total": st.column_config.NumberColumn(
+                                disabled=True, format="%.1f W",
+                            ),
+                            **{m: st.column_config.NumberColumn(
+                                min_value=0.0, step=0.5, format="%.1f W",
+                              ) for m in mode_header},
+                        },
                     )
                 else:
-                    with st.expander(
-                        f"Per-mode power (W) — {picked_code}",
-                        expanded=True,
-                    ):
-                        cols = st.columns(min(3, max(1, len(equipment_modes))))
-                        for i, mode in enumerate(equipment_modes):
-                            with cols[i % len(cols)]:
-                                mid = str(mode["id"])
-                                key = f"_bud_power_{picked_code}_{mid}"
-                                power_inputs[(picked_code, mid)] = st.number_input(
-                                    f"{mode['name']} (W)",
-                                    min_value=0.0,
-                                    value=float(pwr_by_mode.get(mid, 0.0)),
-                                    step=0.5,
-                                    key=key,
-                                    disabled=not can("edit_budget"),
-                                    format="%.1f",
-                                )
+                    st.dataframe(
+                        summary_df, hide_index=True, width="stretch",
+                        column_config={
+                            "Code": st.column_config.TextColumn(),
+                            "Name": st.column_config.TextColumn(),
+                            "Total": st.column_config.NumberColumn(format="%.1f W"),
+                            **{m: st.column_config.NumberColumn(format="%.1f W")
+                               for m in mode_header},
+                        },
+                    )
+                    st.caption("🔒 Read-only — `edit_budget` permission required")
+                    summary_edited = summary_df  # no-op for the Save path
 
             if st.button(
                 "Save & Recalculate", key="_bud_equip_save", type="primary",
@@ -3472,20 +3435,39 @@ def page_budgets():
                                     "source": "equipment_editor",
                                 }).execute()
 
-                        # Power: one row per mode. Only the equipment
-                        # currently selected in the picker has fresh
-                        # values in `power_inputs`; for the other
-                        # equipment rows we keep the existing values
-                        # from the cache so Save doesn't reset them to 0.
+                        # Power: one row per mode. Values come straight from
+                        # the inline-editable per-mode power matrix above
+                        # (summary_edited), so the user edits all equipment
+                        # in one place and Save persists them in one go.
                         power_by_mode: dict[str, float] = {}
-                        existing_pwr = eb.get(code, {}).get("power_by_mode", {}) or {}
-                        if client:
+                        if client and summary_edited is not None:
+                            # Find the matching row in the power matrix
+                            # (the editor's row order matches equip_nodes,
+                            # so we also fall back to code lookup in case
+                            # Streamlit reorders the df).
+                            prow = summary_edited.loc[
+                                summary_edited["Code"] == code
+                            ]
+                            if prow.empty and len(summary_edited) > 0:
+                                prow = summary_edited.iloc[[0]]
                             for mode in equipment_modes:
                                 mid = str(mode["id"])
-                                if (code, mid) in power_inputs:
-                                    power_w = float(power_inputs[(code, mid)])
+                                mname = mode["name"]
+                                if not prow.empty and mname in prow.columns:
+                                    try:
+                                        power_w = float(prow.iloc[0][mname])
+                                    except (TypeError, ValueError):
+                                        power_w = float(
+                                            eb.get(code, {}).get(
+                                                "power_by_mode", {}
+                                            ).get(mid, 0.0)
+                                        )
                                 else:
-                                    power_w = float(existing_pwr.get(mid, 0.0))
+                                    power_w = float(
+                                        eb.get(code, {}).get(
+                                            "power_by_mode", {}
+                                        ).get(mid, 0.0)
+                                    )
                                 power_by_mode[mid] = power_w
                                 res = client.table("budgets").update({
                                     "nominal_value": power_w, "quantity": qty,
